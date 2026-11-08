@@ -78,7 +78,7 @@ enum CLI {
                     for (icon, color) in [(MatrixIcon.microphone, RGB.red), (.mutedMicrophone, .green),
                                           (.fire, .amber), (.prohibited, .blue), (.dot, .green)] {
                         matrix.icons.unmuted = icon
-                        print("Showing \(icon.label), \(color.hex), 2% brightness")
+                        print("Showing \(icon.label), \(color.hex), 5% brightness")
                         testMatrix(matrix, color: color, seconds: 1)
                     }
                 }
@@ -199,10 +199,10 @@ enum CLI {
         Usage: TeamsMuteLight --cli <command>
           devices                                   List HID lights and Espressif USB serial devices
           matrix-probe [serial]                     Verify MicMatrix firmware without lighting LEDs
-          matrix-test [serial]                      Show five icons below 2%, then turn off
-          matrix-rainbow [serial]                   Full-panel rainbow flow for 3 s at 2%, then off
+          matrix-test [serial]                      Show five icons at 5%, then turn off
+          matrix-rainbow [serial]                   Full-panel rainbow flow for 3 s at 5%, then off
           matrix <icon> <#RRGGBB|off> [seconds] [serial] [offset] [mirror] [color|mono]
-                                                    Show one icon below 2% (default 3 s, maximum 60 s)
+                                                    Show one icon at 5% (default 3 s, maximum 60 s)
                                                     Offset: 0...3; mirror: 0 or 1
           kuando <#RRGGBB|off> [seconds]            Set the Kuando Busylight color (default 10 s)
           blinkstick <#RRGGBB|off> [seconds] [leds] Set the BlinkStick color

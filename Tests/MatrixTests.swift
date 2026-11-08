@@ -29,10 +29,10 @@ enum MatrixTests {
             precondition((0...25).contains(frame.brightness))
         }
         precondition(MatrixFrame.maxLevel == 0.10)
-        precondition(MatrixFrame.defaultLevel == 0.09 && MatrixFrame.demoLevel == 0.02)
+        precondition(MatrixFrame.defaultLevel == 0.09 && MatrixFrame.demoLevel == 0.05)
         precondition(MatrixFrame(color: .red, brightness: 0.05, rotation: 0, icon: .dot).brightness == 13)
         precondition(MatrixFrame(color: .red, brightness: MatrixFrame.defaultLevel, rotation: 0, icon: .dot).brightness == 23)
-        precondition(MatrixFrame(color: .red, brightness: MatrixFrame.demoLevel, rotation: 0, icon: .dot).brightness == 5)
+        precondition(MatrixFrame(color: .red, brightness: MatrixFrame.demoLevel, rotation: 0, icon: .dot).brightness == 13)
         precondition(MatrixFrame(color: .red, brightness: 0.10, rotation: 0, icon: .dot).brightness == 25)
         for level in [-1.0, Double.nan, Double.infinity, -Double.infinity] {
             precondition(MatrixFrame(color: .red, brightness: level, rotation: 0, icon: .dot).brightness == 0)

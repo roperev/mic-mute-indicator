@@ -3,6 +3,7 @@ import Foundation
 @main
 enum MatrixGallery {
     static func main() throws {
+        let animated = CommandLine.arguments.contains("--animated")
         let icons = MatrixIcon.allCases.filter { $0 != .off }
         let variants: [(String, Bool, RGB)] = [
             ("Full-color artwork", true, .green),
@@ -38,12 +39,13 @@ enum MatrixGallery {
                 let scale = column == 0 ? "1" : "0.5"
                 let frame = MatrixFrame(color: variant.2, brightness: MatrixFrame.defaultLevel,
                                         rotation: 0, icon: icon, fullColor: variant.1)
-                let count = icon == .afk ? 3 : icon == .shrug ? MatrixIconAnimation.shrugWidth + 8 : 1
+                let animateIcon = animated && icon.isAnimated
+                let count = !animateIcon ? 1 : icon == .afk ? 3 : MatrixIconAnimation.shrugWidth + 8
                 let interval = icon == .afk ? MatrixIconAnimation.letterDuration : 0.125
                 let frames = (0..<count).map { step in
                     MatrixFrame(color: variant.2, brightness: MatrixFrame.defaultLevel,
                         rotation: 0, icon: icon, fullColor: variant.1,
-                        animationTime: icon.isAnimated ? Double(step) * interval : nil).pixels
+                        animationTime: animateIcon ? Double(step) * interval : nil).pixels
                 }
                 precondition(frame.pixels.count == 64)
                 svg += """
@@ -61,10 +63,10 @@ enum MatrixGallery {
                         let duration = Double(count) * interval
                         let fills = frames.map { $0[index].hex }.joined(separator: ";")
                         let opacity = frames.map { $0[index].isOff ? "0" : "1" }.joined(separator: ";")
-                        let fillAnimation = icon.isAnimated
+                        let fillAnimation = animateIcon
                             ? "<animate attributeName=\"fill\" values=\"\(fills)\" dur=\"\(duration)s\" calcMode=\"discrete\" repeatCount=\"indefinite\"/>" : ""
                         svg += "<g opacity=\"\(color.isOff ? 0 : 1)\">"
-                        if icon.isAnimated {
+                        if animateIcon {
                             svg += "<animate attributeName=\"opacity\" values=\"\(opacity)\" dur=\"\(duration)s\" calcMode=\"discrete\" repeatCount=\"indefinite\"/>"
                         }
                         svg += "<rect x=\"\(x - 1)\" y=\"\(y - 1)\" width=\"15\" height=\"15\" rx=\"4\" fill=\"\(color.hex)\" opacity=\".8\" filter=\"url(#glow)\">\(fillAnimation)</rect>"
@@ -75,7 +77,8 @@ enum MatrixGallery {
             }
         }
         svg += "</g></svg>\n"
-        let path = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "Resources/matrix-gallery.svg"
+        let path = CommandLine.arguments.dropFirst().first { $0 != "--animated" }
+            ?? "Resources/matrix-gallery.svg"
         try svg.write(toFile: path, atomically: true, encoding: .utf8)
         print("Generated \(icons.count * variants.count) exact 8x8 previews: \(path)")
     }

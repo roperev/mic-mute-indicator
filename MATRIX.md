@@ -15,7 +15,7 @@ The tested board uses **RGB**, not the font example's GRB order. Pixel wiring is
 | Firmware nonzero floor | `3/255` |
 | Firmware maximum | `25/255`, approximately **9.8%** |
 | Editable status multipliers | **0-100%** of master |
-| CLI hardware demos | **2%**, independent of saved master |
+| CLI hardware demos | **5%**, independent of saved master |
 
 **Waveshare warns that excessive brightness can damage the board.** A case may reduce perceived light without reducing heat. Begin around 2% for exposed LEDs, avoid sustained full-panel white, and unplug unusually hot hardware. The ceiling is a precaution, not a thermal guarantee.
 
@@ -79,6 +79,8 @@ Unavailable is a fixed red ! with yellow accents, at master brightness. It is no
 
 The [gallery](Resources/matrix-gallery.svg) has 16 choices and 48 previews:
 
+The default gallery is static. The [animated gallery](Resources/matrix-gallery-animated.svg) is a separate, opt-in view; it can be GPU-intensive. `generate-matrix-gallery.sh` regenerates both versions from the same artwork. Static AFK shows A; static Shrug shows its central glyphs rather than an empty first frame.
+
 Microphone, Muted microphone, Fire, No sign, Check, Dot, Orientation arrow, Warning, Heart, Adobe A, Rainbow, Headphones, Moon, AFK, Smiley, Shrug.
 
 - **Original palette:** preserves artwork hue; saved color's strongest channel determines palette gain. Fresh defaults use full gain.
@@ -111,7 +113,7 @@ Serial I/O is nonblocking on a private queue. Exclusive access, partial writes, 
 
 ## CLI demos
 
-Disable matrix output in the running app before using the CLI. Demos use 2%, not the new-install 9% master.
+Disable matrix output in the running app before using the CLI. Demos use 5%, not the new-install 9% master.
 
 ```bash
 APP="/Applications/Teams Mute Light.app/Contents/MacOS/TeamsMuteLight"

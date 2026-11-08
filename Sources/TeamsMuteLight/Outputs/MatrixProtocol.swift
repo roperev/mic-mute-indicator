@@ -355,7 +355,7 @@ struct MatrixFrame: Equatable {
     static let maxBrightness = 25
     static let maxLevel = 0.10
     static let defaultLevel = 0.09
-    static let demoLevel = 0.02
+    static let demoLevel = 0.05
     let color: RGB
     let brightness: Int
     let rotation: Int

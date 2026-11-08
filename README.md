@@ -82,7 +82,7 @@ The three editable statuses use full palette intensity; relative sliders supply 
 
 ![Matrix artwork gallery: 16 choices, each in original palette, red and cyan](Resources/matrix-gallery.svg)
 
-[Open the animated gallery](Resources/matrix-gallery.svg). AFK cycles A/F/K; Shrug scrolls `¯\_(ツ)_/¯` right-to-left. Some README renderers show only still frames. Each board has exactly 64 simulated LEDs; glow is illustrative.
+The embedded gallery is **static** to keep browsing responsive. [Open the animated gallery on demand](Resources/matrix-gallery-animated.svg) to see AFK cycle A/F/K and Shrug scroll `¯\_(ツ)_/¯` right-to-left. The animated version can be GPU-intensive; close it when finished. Each board has exactly 64 simulated LEDs; glow is illustrative.
 
 For flashing, safety, CLI demos, calibration and the v3 USB protocol, see the [matrix guide](MATRIX.md).
 

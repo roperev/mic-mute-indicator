@@ -6,3 +6,4 @@ swiftc Sources/TeamsMuteLight/Models.swift \
   Sources/TeamsMuteLight/Outputs/MatrixProtocol.swift \
   scripts/MatrixGallery.swift -o build/matrix-gallery-generator
 build/matrix-gallery-generator Resources/matrix-gallery.svg
+build/matrix-gallery-generator Resources/matrix-gallery-animated.svg --animated
