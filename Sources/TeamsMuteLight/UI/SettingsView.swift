@@ -8,7 +8,7 @@ struct SettingsView: View {
             EffectsTab().tabItem { Label("Effects", systemImage: "sparkles") }
             AdvancedTab().tabItem { Label("Advanced", systemImage: "slider.horizontal.3") }
         }
-        .frame(width: 560, height: 600)
+        .frame(width: 760, height: 680)
     }
 }
 
@@ -40,6 +40,7 @@ private struct Caption: View {
 
 struct StateColorsEditor: View {
     @Binding var config: OutputConfig
+    var maximumBrightness: Double = 1
 
     var body: some View {
         ForEach(configurableStates) { state in
@@ -56,8 +57,9 @@ struct StateColorsEditor: View {
         }
         LabeledContent("Brightness") {
             HStack {
-                Slider(value: $config.brightness, in: 0.05...1)
-                Text("\(Int(config.brightness * 100))%").monospacedDigit().frame(width: 40, alignment: .trailing)
+                Slider(value: $config.brightness, in: LightBrightness.minimum...maximumBrightness)
+                Text(maximumBrightness < 1 ? String(format: "%.1f%%", config.brightness * 100) : "\(Int(config.brightness * 100))%")
+                    .monospacedDigit().frame(width: maximumBrightness < 1 ? 50 : 40, alignment: .trailing)
             }
         }
     }
@@ -159,6 +161,42 @@ struct LightsTab: View {
                     devicePicker(selection: $c.settings.blinkStick.deviceSerial, devices: sticks)
                     Stepper("LEDs: \(c.settings.blinkStickLEDCount)", value: $c.settings.blinkStickLEDCount, in: 1...64)
                     StateColorsEditor(config: $c.settings.blinkStick)
+                }
+            }
+
+            Section {
+                Toggle("Waveshare ESP32-S3 Matrix (USB)", isOn: $c.settings.matrix.light.enabled)
+                if c.settings.matrix.light.enabled {
+                    StatusDot(ok: c.matrix.statusText.hasPrefix("OK"), text: c.matrix.statusText)
+                    Picker("Device", selection: $c.settings.matrix.light.deviceSerial) {
+                        Text("First Espressif device").tag("")
+                        ForEach(c.matrix.devices) { d in
+                            Text(d.displayName).tag(d.serial)
+                        }
+                        if !c.settings.matrix.light.deviceSerial.isEmpty,
+                           !c.matrix.devices.contains(where: { $0.serial == c.settings.matrix.light.deviceSerial }) {
+                            Text("Disconnected: \(c.settings.matrix.light.deviceSerial)").tag(c.settings.matrix.light.deviceSerial)
+                        }
+                    }
+                    MatrixStatusEditor(config: $c.settings.matrix) { c.preview($0) }
+                    Caption("Unavailable automatically shows the warning exclamation point at master brightness. Use Display to turn individual statuses off.")
+                    LabeledContent("Master matrix brightness") {
+                        HStack {
+                            Slider(value: $c.settings.matrix.light.brightness, in: LightBrightness.minimum...MatrixFrame.maxLevel)
+                            Text(String(format: "%.1f%%", c.settings.matrix.light.brightness * 100))
+                                .monospacedDigit().frame(width: 50)
+                        }
+                        Caption("Status brightness is relative to the master: 50% of a 2% master is about 1% output. 0% turns that status off. Very low levels may disappear due to LED precision. The call-start rainbow uses the master only.")
+                        Caption("Gamma-corrected LED colors reduce washout as brightness increases. Intentional artwork highlights are preserved.")
+                    }
+                    DisclosureGroup("Orientation calibration") {
+                        Picker("Offset", selection: $c.settings.matrix.rotation) {
+                            ForEach(0..<4) { Text("\($0 * 90) degrees").tag($0) }
+                        }
+                        Toggle("Mirror", isOn: $c.settings.matrix.mirrored)
+                        Caption("Automatic rotation is always on. Adjust these only if the graphics are not upright; lying flat retains the last orientation.")
+                    }
+                    Caption("USB firmware v3. Default brightness 2%, maximum 10%. The display clears on pause, quit, or after 3 seconds without updates. Test buttons preview all enabled lights.")
                 }
             }
 

@@ -4,6 +4,19 @@ import Foundation
 enum Effects {
     static let frameInterval: TimeInterval = 1.0 / 25.0
 
+    static func menuBarColor(state: MicState, paused: Bool, time: TimeInterval) -> RGB {
+        guard !paused else { return RGB(r: 255, g: 255, b: 255) }
+        switch state {
+        case .unmuted:
+            let intensity = 0.45 + 0.55 * (0.5 + 0.5 * cos(2 * .pi * time / 1.5))
+            return RGB.red.scaled(intensity)
+        case .muted:
+            return .green
+        case .notInMeeting, .unknown:
+            return RGB(r: 255, g: 255, b: 255)
+        }
+    }
+
     /// Brightness multiplier 0...1 for `effect` at `t` seconds into the state.
     static func level(_ effect: LightEffect, rateHz: Double, t: TimeInterval) -> Double {
         let rate = max(0.1, min(10, rateHz))
@@ -38,6 +51,22 @@ enum Effects {
         let sweep = max(0, min(1, (local - hold) / (1 - 2 * hold)))
         let hue = (rainbowStartHue + sweep).truncatingRemainder(dividingBy: 1)
         return hsv(hue, 1, 1, gamma: 2.2)
+    }
+
+    static func matrixRainbow(t: TimeInterval, duration: TimeInterval, sweeps: Int) -> [RGB] {
+        guard t.isFinite, duration.isFinite, t >= 0 else {
+            return Array(repeating: .off, count: 64)
+        }
+        let progress = max(0, min(1, t / max(0.2, duration)))
+        let phase = progress * Double(max(1, sweeps))
+        return (0..<64).map { index in
+            let x = Double(index % 8) / 8
+            let y = Double(index / 8) / 8
+            let ripple = 0.12 * sin(2 * .pi * (y - phase))
+            let hue = (x * 0.7 + y * 0.3 + phase + ripple)
+                .truncatingRemainder(dividingBy: 1)
+            return hsv(hue < 0 ? hue + 1 : hue, 1, 1)
+        }
     }
 
     /// HSV -> RGB. `gamma` > 1 corrects for linear LED PWM vs. the eye's non-linear response,

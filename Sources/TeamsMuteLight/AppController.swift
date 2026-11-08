@@ -22,7 +22,15 @@ final class AppController: ObservableObject {
     @Published private(set) var axTrusted = AccessibilityMonitor.isTrusted
     @Published private(set) var hidDevices: [HIDDeviceInfo] = []
     @Published private(set) var patternError: String?
-    @Published var paused = false { didSet { if paused != oldValue { pushLights() } } }
+    @Published var paused = false {
+        didSet {
+            if paused != oldValue {
+                updateMenuBarPulse()
+                pushLights()
+            }
+        }
+    }
+    @Published private(set) var menuBarPulseTime: TimeInterval = 0
     @Published private(set) var previewState: MicState?
     @Published var homeAssistantToken: String {
         didSet {
@@ -36,6 +44,7 @@ final class AppController: ObservableObject {
     let axMonitor = AccessibilityMonitor()
     let kuando = KuandoLight()
     let blinkStick = BlinkStickLight()
+    let matrix = MatrixLight()
     let homeAssistant = HomeAssistantLight()
     let webhook = WebhookLight()
 
@@ -44,6 +53,26 @@ final class AppController: ObservableObject {
     private var trustTimer: Timer?
     private var statusTimer: Timer?
     private var tokens: [NSObjectProtocol] = []
+    private var screenLockTokens: [NSObjectProtocol] = []
+    private var matrixAvailability = MatrixDisplayAvailability()
+    private var matrixAutomaticallyBlanked = false
+    private var menuBarPulseTimer: Timer?
+
+    private func updateMenuBarPulse() {
+        guard micState == .unmuted && !paused else {
+            menuBarPulseTimer?.invalidate()
+            menuBarPulseTimer = nil
+            menuBarPulseTime = 0
+            return
+        }
+        guard menuBarPulseTimer == nil else { return }
+        let start = ProcessInfo.processInfo.systemUptime
+        let timer = Timer(timeInterval: 0.12, repeats: true) { [weak self] _ in
+            self?.menuBarPulseTime = ProcessInfo.processInfo.systemUptime - start
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        menuBarPulseTimer = timer
+    }
 
     init() {
         settings = AppSettings.load()
@@ -61,6 +90,7 @@ final class AppController: ObservableObject {
         }
         HIDDeviceManager.shared.addObserver { [weak self] in self?.refreshDevices() }
         refreshDevices()
+        matrix.onChange = { [weak self] in self?.objectWillChange.send() }
 
         configureOutputs()
         configureDetection()
@@ -134,6 +164,7 @@ final class AppController: ObservableObject {
         if activeOutputs.isEmpty { return .noLightsEnabled }
         if settings.kuando.enabled && kuando.connectedDevice == nil { return .lightDisconnected("Busylight") }
         if settings.blinkStick.enabled && blinkStick.connectedDevice == nil { return .lightDisconnected("BlinkStick") }
+        if settings.matrix.light.enabled && matrix.connectedDevice == nil { return .lightDisconnected("Waveshare Matrix") }
         return nil
     }
 
@@ -206,6 +237,7 @@ final class AppController: ObservableObject {
         }
         if source != src { source = src }
         if detail != det { detail = det }
+        updateMenuBarPulse()
         if callStarted && settings.callStartRainbow && !paused {
             Log.info("Call started — rainbow sweep")
             playRainbow()
@@ -225,6 +257,7 @@ final class AppController: ObservableObject {
         var list: [Active] = []
         if settings.kuando.enabled { list.append(Active(output: kuando, config: settings.kuando)) }
         if settings.blinkStick.enabled { list.append(Active(output: blinkStick, config: settings.blinkStick)) }
+        if settings.matrix.light.enabled { list.append(Active(output: matrix, config: settings.matrix.light)) }
         if settings.homeAssistant.light.enabled { list.append(Active(output: homeAssistant, config: settings.homeAssistant.light)) }
         if settings.webhook.light.enabled { list.append(Active(output: webhook, config: settings.webhook.light)) }
         return list
@@ -234,6 +267,13 @@ final class AppController: ObservableObject {
         kuando.serial = settings.kuando.deviceSerial
         blinkStick.serial = settings.blinkStick.deviceSerial
         blinkStick.ledCount = settings.blinkStickLEDCount
+        matrix.serial = settings.matrix.light.deviceSerial
+        matrix.icons = settings.matrix.icons
+        matrix.rotation = settings.matrix.rotation
+        matrix.mirrored = settings.matrix.mirrored
+        matrix.fullColor = settings.matrix.fullColor
+        matrix.colorStyles = settings.matrix.colorStyles
+        matrix.brightnessLevels = settings.matrix.brightnessLevels
         homeAssistant.baseURL = settings.homeAssistant.baseURL
         homeAssistant.entityID = settings.homeAssistant.entityID
         webhook.url = settings.webhook.url
@@ -249,15 +289,17 @@ final class AppController: ObservableObject {
     private var rainbowUntil: Date?
 
     func pushLights() {
+        let now = Date()
+        if let until = rainbowUntil, now >= until { rainbowUntil = nil }
         if paused && previewState == nil && rainbowUntil == nil {
             stopAnimation()
             activeOutputs.forEach { $0.output.release() }
             return
         }
-        let now = Date()
-        if let until = rainbowUntil, now >= until { rainbowUntil = nil }
         let state = previewState ?? micState
         let needsAnimation = rainbowUntil != nil || settings.effects[state].effect != .solid
+            || (settings.matrix.light.enabled && !matrixAvailability.shouldBlank(state: micState)
+                && settings.matrix.icons[state].isAnimated)
         if needsAnimation { startAnimation() } else { stopAnimation() }
         renderFrame(state: state, now: now)
     }
@@ -273,9 +315,29 @@ final class AppController: ObservableObject {
                 : Effects.rainbow(t: t, duration: settings.rainbowDuration, sweeps: rainbowSweeps)
         }
         for a in activeOutputs {
+            if a.output === matrix {
+                if matrixAvailability.shouldBlank(state: micState) {
+                    if !matrixAutomaticallyBlanked {
+                        matrix.release()
+                        matrixAutomaticallyBlanked = true
+                        Log.info("Matrix automatically blanked: session locked/inactive or asleep, no active call")
+                    }
+                    continue
+                }
+                if matrixAutomaticallyBlanked {
+                    Log.info("Matrix automatic blanking ended; restoring current status")
+                    matrixAutomaticallyBlanked = false
+                }
+            }
+            let brightness = LightBrightness.clamped(a.config.brightness)
+            if a.output === matrix, rainbowUntil != nil {
+                matrix.applyRainbow(t: now.timeIntervalSince(rainbowStart),
+                    duration: settings.rainbowDuration, sweeps: rainbowSweeps, brightness: brightness)
+                continue
+            }
             let base = a.config.colors[state]
             let color = a.output.supportsAnimation ? (rainbow ?? base.scaled(level)) : base
-            a.output.apply(state: state, color: color, brightness: a.config.brightness)
+            a.output.apply(state: state, color: color, brightness: brightness)
         }
     }
 
@@ -309,11 +371,13 @@ final class AppController: ObservableObject {
     private func settingsChanged(from old: AppSettings) {
         if !settings.kuando.enabled && old.kuando.enabled { kuando.release() }
         if !settings.blinkStick.enabled && old.blinkStick.enabled { blinkStick.release() }
+        if !settings.matrix.light.enabled && old.matrix.light.enabled { matrix.release() }
         if !settings.homeAssistant.light.enabled && old.homeAssistant.light.enabled { homeAssistant.release() }
         if !settings.webhook.light.enabled && old.webhook.light.enabled { webhook.release() }
         // Switching to a different physical device: turn the old one off first.
         if settings.kuando.deviceSerial != old.kuando.deviceSerial { kuando.release() }
         if settings.blinkStick.deviceSerial != old.blinkStick.deviceSerial { blinkStick.release() }
+        if settings.matrix.light.deviceSerial != old.matrix.light.deviceSerial { matrix.release() }
 
         configureOutputs()
 
@@ -359,6 +423,38 @@ final class AppController: ObservableObject {
 
     private func observeSystem() {
         let ws = NSWorkspace.shared.notificationCenter
+        if let session = CGSessionCopyCurrentDictionary() as? [String: Any] {
+            matrixAvailability.locked = session["CGSSessionScreenIsLocked"] as? Bool ?? false
+            matrixAvailability.sessionInactive = (session[kCGSessionOnConsoleKey as String] as? Bool) == false
+        } else {
+            Log.info("Unable to read initial screen-lock state; waiting for macOS session notifications")
+        }
+        let distributed = DistributedNotificationCenter.default()
+        for (name, locked) in [("com.apple.screenIsLocked", true), ("com.apple.screenIsUnlocked", false)] {
+            screenLockTokens.append(distributed.addObserver(forName: Notification.Name(name),
+                object: nil, queue: .main) { [weak self] _ in
+                self?.matrixAvailability.locked = locked
+                self?.pushLights()
+            })
+        }
+        for (name, inactive) in [(NSWorkspace.sessionDidResignActiveNotification, true),
+                                 (NSWorkspace.sessionDidBecomeActiveNotification, false)] {
+            tokens.append(ws.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                self?.matrixAvailability.sessionInactive = inactive
+                self?.pushLights()
+            })
+        }
+        for (name, asleep) in [(NSWorkspace.screensDidSleepNotification, true),
+                               (NSWorkspace.screensDidWakeNotification, false)] {
+            tokens.append(ws.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                self?.matrixAvailability.displayAsleep = asleep
+                self?.pushLights()
+            })
+        }
+        tokens.append(ws.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.matrixAvailability.systemAsleep = true
+            self?.pushLights()
+        })
         tokens.append(ws.addObserver(forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main) { [weak self] note in
             guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
                   let id = app.bundleIdentifier, AccessibilityMonitor.teamsBundleIDs.contains(id) else { return }
@@ -367,6 +463,7 @@ final class AppController: ObservableObject {
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) { self?.teamsAPI.reconnectNow() }
         })
         tokens.append(ws.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.matrixAvailability.systemAsleep = false
             self?.teamsAPI.reconnectNow()
             self?.pushLights()
         })
@@ -376,9 +473,13 @@ final class AppController: ObservableObject {
     }
 
     func shutdown() {
+        menuBarPulseTimer?.invalidate()
+        menuBarPulseTimer = nil
+        screenLockTokens.forEach { DistributedNotificationCenter.default().removeObserver($0) }
+        screenLockTokens.removeAll()
         stopAnimation()
         rainbowUntil = nil
-        let all: [LightOutput] = [kuando, blinkStick, homeAssistant, webhook]
+        let all: [LightOutput] = [kuando, blinkStick, matrix, homeAssistant, webhook]
         all.forEach { $0.release() }
         // Network lights: send "off" explicitly so they don't stay red after quitting.
         if settings.homeAssistant.light.enabled {

@@ -177,6 +177,30 @@ struct OutputConfig: Codable, Equatable {
     var colors: StateColors
     /// Empty = first matching device.
     var deviceSerial: String = ""
+
+    init(enabled: Bool, brightness: Double = 1, colors: StateColors, deviceSerial: String = "") {
+        self.enabled = enabled
+        self.brightness = LightBrightness.clamped(brightness)
+        self.colors = colors
+        self.deviceSerial = deviceSerial
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try c.decode(Bool.self, forKey: .enabled)
+        brightness = LightBrightness.clamped(try c.decodeIfPresent(Double.self, forKey: .brightness) ?? 1)
+        colors = try c.decode(StateColors.self, forKey: .colors)
+        deviceSerial = try c.decodeIfPresent(String.self, forKey: .deviceSerial) ?? ""
+    }
+}
+
+enum LightBrightness {
+    static let minimum = 0.01
+
+    static func clamped(_ value: Double, maximum: Double = 1) -> Double {
+        guard value.isFinite, value > 0 else { return 0 }
+        return max(minimum, min(maximum, value))
+    }
 }
 
 struct HomeAssistantConfig: Codable, Equatable {
@@ -202,6 +226,7 @@ struct AppSettings: Codable, Equatable {
     var kuando = OutputConfig(enabled: true, colors: .muteLight)
     var blinkStick = OutputConfig(enabled: false, colors: .muteLight)
     var blinkStickLEDCount = 2
+    var matrix = MatrixConfig()
     var homeAssistant = HomeAssistantConfig()
     var webhook = WebhookConfig()
 
@@ -222,6 +247,7 @@ struct AppSettings: Codable, Equatable {
         kuando = (try? c.decodeIfPresent(OutputConfig.self, forKey: .kuando)) ?? d.kuando
         blinkStick = (try? c.decodeIfPresent(OutputConfig.self, forKey: .blinkStick)) ?? d.blinkStick
         blinkStickLEDCount = (try? c.decodeIfPresent(Int.self, forKey: .blinkStickLEDCount)) ?? d.blinkStickLEDCount
+        matrix = (try? c.decodeIfPresent(MatrixConfig.self, forKey: .matrix)) ?? d.matrix
         homeAssistant = (try? c.decodeIfPresent(HomeAssistantConfig.self, forKey: .homeAssistant)) ?? d.homeAssistant
         webhook = (try? c.decodeIfPresent(WebhookConfig.self, forKey: .webhook)) ?? d.webhook
         effects = (try? c.decodeIfPresent(StateEffects.self, forKey: .effects)) ?? d.effects

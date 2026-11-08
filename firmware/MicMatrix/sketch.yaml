@@ -1,0 +1,10 @@
+profiles:
+  matrix:
+    fqbn: esp32:esp32:esp32s3:CDCOnBoot=cdc,USBMode=hwcdc,FlashSize=4M,PartitionScheme=default,PSRAM=disabled
+    platforms:
+      - platform: esp32:esp32 (3.3.12)
+        platform_index_url: https://espressif.github.io/arduino-esp32/package_esp32_index.json
+    libraries:
+      - Adafruit NeoPixel (1.15.5)
+      - SensorLib (0.5.1)
+default_profile: matrix
