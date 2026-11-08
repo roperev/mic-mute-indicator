@@ -65,7 +65,7 @@ enum CLI {
                     let start = Date()
                     while Date().timeIntervalSince(start) < 3 {
                         matrix.applyRainbow(t: Date().timeIntervalSince(start), duration: 3,
-                            sweeps: 2, brightness: MatrixFrame.defaultLevel)
+                            sweeps: 2, brightness: MatrixFrame.demoLevel)
                         spin(Effects.frameInterval)
                         if matrix.statusText.hasPrefix("Error:") {
                             let error = matrix.statusText
@@ -154,7 +154,7 @@ enum CLI {
 
     private static func testMatrix(_ matrix: MatrixLight, color: RGB, seconds: Double) {
         let previous = matrix.acknowledgedFrames
-        matrix.apply(state: .unmuted, color: color, brightness: MatrixFrame.defaultLevel)
+        matrix.apply(state: .unmuted, color: color, brightness: MatrixFrame.demoLevel)
         let deadline = Date().addingTimeInterval(5)
         while matrix.acknowledgedFrames == previous && Date() < deadline {
             spin(0.05)
@@ -171,7 +171,7 @@ enum CLI {
         let until = Date().addingTimeInterval(seconds)
         while Date() < until {
             if matrix.icons[.unmuted].isAnimated {
-                matrix.apply(state: .unmuted, color: color, brightness: MatrixFrame.defaultLevel)
+                matrix.apply(state: .unmuted, color: color, brightness: MatrixFrame.demoLevel)
             }
             spin(min(0.05, until.timeIntervalSinceNow))
             guard matrix.connectedDevice != nil, matrix.statusText.hasPrefix("OK") else {

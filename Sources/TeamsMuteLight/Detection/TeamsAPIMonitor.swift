@@ -33,7 +33,7 @@ final class TeamsAPIMonitor: NSObject, URLSessionWebSocketDelegate {
     }
 
     static let appName = "TeamsMuteLight"
-    static let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.0.0"
+    static let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.0.1"
 
     private var session: URLSession!
     private var task: URLSessionWebSocketTask?

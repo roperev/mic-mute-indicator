@@ -22,7 +22,7 @@ enum MatrixGallery {
         <rect width="100%" height="100%" fill="#080c12"/>
         <g fill="#e5edf5" font-family="system-ui, sans-serif">
         <text x="32" y="40" font-size="25" font-weight="700">MicMatrix / 8x8 pixel gallery</text>
-        <text x="32" y="67" font-size="13" fill="#93a9bb">Shared device artwork. Default 2%; maximum 10%. Preview glow is illustrative.</text>
+        <text x="32" y="67" font-size="13" fill="#93a9bb">Shared device artwork. New-install master 9%; maximum 10%. Preview glow is illustrative.</text>
         """
         svg += "<text x=\"32\" y=\"94\" font-size=\"13\" fill=\"#93a9bb\">Large boards: full color. Small boards beneath: red / cyan single-color alternatives.</text>"
         for (row, icon) in icons.enumerated() {

@@ -1,5 +1,16 @@
 # Release notes
 
+## v2.0.1 — 2026-11-07
+
+- New installs use a 9.0% matrix master brightness, intended for a light-diffusing case. Reduce brightness for exposed LEDs; the 10% safety ceiling is unchanged.
+- Live defaults to Dot, Original palette, 100% relative brightness, and Pulse at 1 Hz.
+- Muted defaults to Muted microphone, Original palette, 75% relative brightness, and Solid.
+- Not in meeting defaults to Adobe A, Original palette, 20% relative brightness, and Solid.
+- New matrix status colors use full palette intensity; relative sliders provide the dimming. Matrix enablement is still opt-in.
+- Existing saved settings are preserved. Older settings without relative brightness retain 100% multipliers.
+- CLI demos remain at 2% brightness, independently of the new-install master.
+- Reorganized the README hardware section and moved detailed setup, safety, calibration, protocol, and hardware testing to the [matrix guide](MATRIX.md).
+
 ## v2.0.0 — 2026-11-07
 
 ### Added

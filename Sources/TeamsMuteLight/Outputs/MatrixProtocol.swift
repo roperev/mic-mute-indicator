@@ -172,9 +172,9 @@ enum MatrixIconAnimation {
 }
 
 struct MatrixIcons: Codable, Equatable {
-    var notInMeeting: MatrixIcon = .dot
+    var notInMeeting: MatrixIcon = .shield
     var muted: MatrixIcon = .mutedMicrophone
-    var unmuted: MatrixIcon = .microphone
+    var unmuted: MatrixIcon = .dot
     var unknown: MatrixIcon = .warning
 
     subscript(_ state: MicState) -> MatrixIcon {
@@ -236,12 +236,19 @@ struct MatrixColorStyles: Codable, Equatable {
 }
 
 struct MatrixBrightnessLevels: Codable, Equatable {
-    var notInMeeting = 1.0
-    var muted = 1.0
+    var notInMeeting = 0.20
+    var muted = 0.75
     var unmuted = 1.0
     var unknown = 1.0
 
     init() {}
+
+    static var legacy: MatrixBrightnessLevels {
+        var levels = MatrixBrightnessLevels()
+        levels.notInMeeting = 1
+        levels.muted = 1
+        return levels
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -280,7 +287,8 @@ struct MatrixBrightnessLevels: Codable, Equatable {
 }
 
 struct MatrixConfig: Codable, Equatable {
-    var light = OutputConfig(enabled: false, brightness: MatrixFrame.defaultLevel, colors: .muteLight)
+    var light = OutputConfig(enabled: false, brightness: MatrixFrame.defaultLevel,
+        colors: StateColors(notInMeeting: .red, muted: .green, unmuted: .red, unknown: .off))
     var icons = MatrixIcons()
     var rotation = 0
     var mirrored = false
@@ -301,7 +309,7 @@ struct MatrixConfig: Codable, Equatable {
         mirrored = try c.decodeIfPresent(Bool.self, forKey: .mirrored) ?? d.mirrored
         fullColor = try c.decodeIfPresent(Bool.self, forKey: .fullColor) ?? d.fullColor
         brightnessLevels = try c.decodeIfPresent(MatrixBrightnessLevels.self, forKey: .brightnessLevels)
-            ?? d.brightnessLevels
+            ?? .legacy
         if let saved = try c.decodeIfPresent(MatrixColorStyles.self, forKey: .colorStyles) {
             colorStyles = saved
         } else if !fullColor {
@@ -346,7 +354,8 @@ struct MatrixFrame: Equatable {
 
     static let maxBrightness = 25
     static let maxLevel = 0.10
-    static let defaultLevel = 0.02
+    static let defaultLevel = 0.09
+    static let demoLevel = 0.02
     let color: RGB
     let brightness: Int
     let rotation: Int

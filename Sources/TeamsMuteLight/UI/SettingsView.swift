@@ -196,7 +196,7 @@ struct LightsTab: View {
                         Toggle("Mirror", isOn: $c.settings.matrix.mirrored)
                         Caption("Automatic rotation is always on. Adjust these only if the graphics are not upright; lying flat retains the last orientation.")
                     }
-                    Caption("USB firmware v3. Default brightness 2%, maximum 10%. The display clears on pause, quit, or after 3 seconds without updates. Test buttons preview all enabled lights.")
+                    Caption("USB firmware v3. New-install brightness 9%, maximum 10%. Reduce brightness for an uncased board. The display clears on pause, quit, or after 3 seconds without updates. Test buttons preview all enabled lights.")
                 }
             }
 

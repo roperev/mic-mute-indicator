@@ -18,7 +18,8 @@ enum MatrixTests {
         try testNewArtworkAndAnimations()
         testAutomaticDisplayBlanking()
         testMenuBarColors()
-        print("Fifteen Swift matrix protocol, artwork, brightness, and effects tests passed.")
+        try testFreshInstallDefaults()
+        print("Sixteen Swift matrix protocol, artwork, brightness, and effects tests passed.")
     }
 
     static func testBrightnessCeilingForAllInputLevels() {
@@ -28,9 +29,10 @@ enum MatrixTests {
             precondition((0...25).contains(frame.brightness))
         }
         precondition(MatrixFrame.maxLevel == 0.10)
-        precondition(MatrixFrame.defaultLevel == 0.02)
+        precondition(MatrixFrame.defaultLevel == 0.09 && MatrixFrame.demoLevel == 0.02)
         precondition(MatrixFrame(color: .red, brightness: 0.05, rotation: 0, icon: .dot).brightness == 13)
-        precondition(MatrixFrame(color: .red, brightness: MatrixFrame.defaultLevel, rotation: 0, icon: .dot).brightness == 5)
+        precondition(MatrixFrame(color: .red, brightness: MatrixFrame.defaultLevel, rotation: 0, icon: .dot).brightness == 23)
+        precondition(MatrixFrame(color: .red, brightness: MatrixFrame.demoLevel, rotation: 0, icon: .dot).brightness == 5)
         precondition(MatrixFrame(color: .red, brightness: 0.10, rotation: 0, icon: .dot).brightness == 25)
         for level in [-1.0, Double.nan, Double.infinity, -Double.infinity] {
             precondition(MatrixFrame(color: .red, brightness: level, rotation: 0, icon: .dot).brightness == 0)
@@ -65,7 +67,7 @@ enum MatrixTests {
 
     static func testIconsAndStateSelection() {
         var icons = MatrixIcons()
-        precondition(icons[.unmuted] == .microphone)
+        precondition(icons[.unmuted] == .dot)
         precondition(icons[.muted] == .mutedMicrophone)
         icons[.unmuted] = .fire
         precondition(icons.unmuted == .fire)
@@ -196,7 +198,7 @@ enum MatrixTests {
 
     static func testRelativeStatusBrightness() throws {
         var config = MatrixConfig()
-        precondition(MicState.allCases.allSatisfy { config.brightnessLevels[$0] == 1 })
+        precondition(config.brightnessLevels.muted == 0.75 && config.brightnessLevels.notInMeeting == 0.20)
         config.brightnessLevels[.muted] = 0.5
         config.brightnessLevels[.notInMeeting] = 0.25
         config.brightnessLevels[.unknown] = 0
@@ -318,6 +320,35 @@ enum MatrixTests {
         precondition(Effects.menuBarColor(state: .unmuted, paused: false, time: 0) == .red)
         precondition(Effects.menuBarColor(state: .unmuted, paused: false, time: 0.75) != .red)
         precondition(Effects.menuBarColor(state: .unmuted, paused: false, time: 1.5) == .red)
+    }
+
+    static func testFreshInstallDefaults() throws {
+        let fresh = AppSettings()
+        precondition(fresh.matrix.light.brightness == 0.09 && !fresh.matrix.light.enabled)
+        for (state, icon, level) in [(MicState.unmuted, MatrixIcon.dot, 1.0),
+                                    (.muted, .mutedMicrophone, 0.75), (.notInMeeting, .shield, 0.20)] {
+            precondition(fresh.matrix.icons[state] == icon)
+            precondition(fresh.matrix.brightnessLevels[state] == level)
+            precondition(fresh.matrix.colorStyles[state] == .artwork)
+            let frame = MatrixFrame.status(state: state, color: fresh.matrix.light.colors[state],
+                brightness: fresh.matrix.light.brightness, icons: fresh.matrix.icons,
+                rotation: 0, mirrored: false, fullColor: fresh.matrix.fullColor,
+                styles: fresh.matrix.colorStyles, levels: fresh.matrix.brightnessLevels, animationTime: 0)
+            precondition(frame.pixels == icon.artwork, "Fresh installs must use the full palette without hidden color gain")
+            precondition(frame.brightness == 23 && frame.relativeBrightness == level)
+        }
+        precondition(fresh.effects.unmuted.effect == .pulse && fresh.effects.unmuted.rateHz == 1)
+        precondition(fresh.effects.muted.effect == .solid && fresh.effects.notInMeeting.effect == .solid)
+        let roundTrip = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(fresh))
+        precondition(roundTrip == fresh)
+        var saved = fresh
+        saved.matrix.light.brightness = 0.02
+        saved.matrix.light.colors = .muteLight
+        saved.matrix.icons.unmuted = .microphone
+        saved.matrix.icons.notInMeeting = .dot
+        saved.matrix.brightnessLevels = .legacy
+        let restored = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(saved))
+        precondition(restored == saved, "Do not apply new defaults over existing settings")
     }
 
     static func testNewArtworkAndAnimations() throws {
