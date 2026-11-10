@@ -1,6 +1,8 @@
 # Release notes
 
-## Unreleased — device-control optimization
+## v3.0.0 — 2026-11-10
+
+### Device-control optimization
 
 - MicMatrix v4 renders all selectable graphics, pulse/flash and AFK/Shrug animations locally using generated canonical artwork and parameterized effects.
 - The app negotiates preset support, sends configuration only on changes, and maintains a small 1 Hz lease heartbeat. V3 firmware retains streamed-frame compatibility; temporary rainbow effects remain streamed.
@@ -8,6 +10,21 @@
 - Host animation stops when there is no visible output requiring software animation, including matrix-only presets. Teams detection and menu-bar pulse scheduling are unchanged.
 - Independent three-second stale-host blanking, IMU safety, orientation, gamma, brightness limits and saved settings are preserved.
 - Added reproducible hardware benchmarks, firmware preset/lease tests and 7,344 byte-exact Swift/firmware rendering comparisons. Install the matching updated app before using v4 firmware; older apps do not understand its handshake.
+
+### Measured results
+
+- Matrix-only presets eliminate the 25 Hz host animation timer; serial maintenance drops from 25 Hz to 1 Hz, with no connected-device discovery scans.
+- Steady-state 1 Hz pulse USB traffic falls from approximately 8,392 bytes/s to 8 bytes/s (over 99.9% lower).
+- Isolated process CPU falls from approximately 1.59% to 0.45% of one core for the Live pulse scenario. Short samples are not a battery-life measurement.
+- Physical 10 Hz flashing averages 50 ms between on/off edges. Firmware timing is best-effort, not hard real-time.
+- Verified signed app/firmware builds, 17 Swift tests, firmware safety/rollover tests, render parity, hardware watchdog/brightness tests, and repeated benchmarks including rainbow-to-preset restoration.
+
+### Upgrade
+
+- Install the v3.0.0 app before flashing MicMatrix v4. Back up and verify the current board flash before replacing it; retain backups outside Git for rollback.
+- App release v3.0.0 and firmware wire protocol v4 are distinct versions. Existing MicMatrix v3 firmware remains usable with the new app through streamed frames; older app releases cannot control v4 firmware.
+- Saved settings and fresh-install defaults are unchanged from v2.0.1. No Teams API protocol, detection, or menu-bar behavior change is required.
+- CLI demos use 5% brightness. The README gallery is static, with the animated version available on demand.
 
 ## v2.0.1 — 2026-11-07
 

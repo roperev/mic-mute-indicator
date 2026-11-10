@@ -2,6 +2,8 @@
 
 [Back to README](README.md#hardware-and-outputs)
 
+For **Teams Mute Light v3.0.0** and **MicMatrix wire protocol v4**. The app also supports v3 firmware through streamed frames; these version numbers are independent.
+
 ## Hardware and safety
 
 The [ESP32-S3-Matrix](https://docs.waveshare.com/ESP32-S3-Matrix) has 64 addressable RGB LEDs on GPIO 14 and a QMI8658 accelerometer on SDA 11 / SCL 12. Native USB CDC provides the connection; Wi-Fi, Bluetooth and the gyroscope are unused.
@@ -22,6 +24,8 @@ The tested board uses **RGB**, not the font example's GRB order. Pixel wiring is
 Gamma-2.2 converts display-encoded colors to linear LED intensities. Relative status gain is applied afterward; firmware then scales every channel by master PWM. Relative dimming can go below the master's floor, and zero remains off. Eight-bit precision can hide weak channels or cause color steps. On-screen previews show normalized source colors, not physical output.
 
 ## Build and flash
+
+Install the v3.0.0 app before flashing v4 firmware: older app releases do not recognize the new handshake. Saved settings and brightness defaults are preserved.
 
 Install Arduino CLI with `brew install arduino-cli`. The pinned profile uses ESP32 Arduino core **3.3.12**, Adafruit NeoPixel **1.15.5**, and SensorLib **0.5.1**.
 
@@ -63,7 +67,7 @@ Restore a verified original with:
 
 Enable **Settings > Lights > Waveshare ESP32-S3 Matrix (USB)** and select its USB serial. A selected serial never falls back to another board. The driver verifies the exact firmware handshake and accelerometer health before showing artwork.
 
-Fresh v2.0.1 settings:
+Fresh v3.0.0 settings (unchanged from v2.0.1):
 
 | Status | Icon | Original palette | Relative level | Effect |
 |---|---|---|---|---|

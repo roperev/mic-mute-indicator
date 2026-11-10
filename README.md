@@ -1,4 +1,4 @@
-# Teams Mute Light v2.0.1
+# Teams Mute Light v3.0.0
 
 A macOS menu-bar app that shows **Microsoft Teams mute state**, not just microphone activity, on USB lights, an 8x8 RGB matrix, or a Home Assistant light.
 
@@ -7,6 +7,8 @@ A macOS menu-bar app that shows **Microsoft Teams mute state**, not just microph
 - **Controls:** per-output colors/brightness, device selection, effects, launch at login, pause, and previews.
 
 [Release notes](CHANGELOG.md) · [Matrix setup and protocol](MATRIX.md)
+
+**New in v3.0.0:** firmware-rendered matrix animations, event-driven USB communication, and no matrix timers while disabled or blanked. Steady-state pulse traffic drops from about 8.4 KB/s to 8 bytes/s. Install the updated app before flashing MicMatrix v4; existing v3 firmware remains supported.
 
 ## Build and run
 
@@ -59,7 +61,7 @@ Menu-bar color follows actual detection, not temporary previews. Its 1.5-second 
 
 The matrix supports independent RGB pixels, automatic upright orientation, a 16-choice visual gallery, and three adjacent status cards. Unavailable uses a fixed warning rather than an editable fourth card.
 
-**Fresh-install defaults (v2.0.1)**
+**Fresh-install defaults (v3.0.0; unchanged from v2.0.1)**
 
 Master brightness: **9.0%**, with a **1-10%** slider range. Matrix output remains opt-in.
 
@@ -145,10 +147,10 @@ Edit the label regexes in Advanced for other languages or changed Teams labels. 
 
 - Install with the same signing identity to retain Accessibility grants.
 - Saved output enables, colors, icons, effects, master brightness and relative levels remain unchanged. Fresh defaults apply only to new settings.
-- The matrix requires `MATRIX 3 8 8 25`; flash matching firmware if upgrading from an older protocol/ceiling.
+- For local matrix animation, install v3.0.0 before flashing MicMatrix v4 (`MATRIX 4 8 8 25 PRESET1`). Older app releases do not recognize that handshake. Existing MicMatrix v3 (`MATRIX 3 8 8 25`) remains supported through frame streaming; earlier protocols/ceilings require an upgrade. Back up and verify the board flash first; see the [matrix guide](MATRIX.md#build-and-flash).
 - Shield selections display Adobe A; saved `shield` and `off` identifiers remain supported. Off is no longer in the chooser; Warning replaces it.
 - Unavailable overrides old Unavailable icon/color/level choices with a fixed warning. Lock/sleep blanking still applies.
-- App release **2.0.1**, Teams API protocol **2.0.0**, and matrix wire protocol **v3** are separate version numbers.
+- App release **3.0.0**, Teams API protocol **2.0.0**, and matrix wire protocol **v4** (with v3 compatibility) are separate version numbers.
 
 ```bash
 bash scripts/test-matrix.sh
@@ -156,7 +158,7 @@ bash scripts/generate-matrix-gallery.sh
 bash build.sh
 ```
 
-The 16 standalone Swift tests and C++ tests work with Command Line Tools alone. They cover defaults/migration, artwork, gamma, brightness, animations, lock/sleep policy, menu-bar colors, protocol parsing and orientation. [Physical USB tests](MATRIX.md#validation) are optional.
+The 17 standalone Swift tests and C++ tests work with Command Line Tools alone. They cover defaults/migration, artwork, gamma, brightness, animations, lock/sleep policy, menu-bar colors, protocol parsing, orientation and lease rollover. Another 7,344 byte-exact comparisons verify Swift/firmware rendering parity. [Physical USB tests and performance benchmarks](MATRIX.md#validation) are optional.
 
 ## Troubleshooting
 
