@@ -75,7 +75,7 @@ The three editable statuses use full palette intensity; relative sliders supply 
 > **Brightness and heat:** The 9% default is intended for a light-diffusing case. Start lower, such as 2%, on exposed LEDs. Firmware caps channel output at `25/255` (9.8%); this is a precaution, **not a thermal guarantee**. Avoid sustained full-panel white and unplug unusually hot hardware.
 
 - **Choose artwork:** click the hero preview. Original palette, Tint artwork, and Single color are available. Display and 0% relative brightness turn a status off.
-- **Preview appearance:** hero thumbnails show normalized color intensity, not physical brightness. Gamma-2.2 correction is applied only to transmitted LED colors.
+- **Preview appearance:** hero thumbnails show normalized color intensity, not physical brightness. Gamma-2.2 correction is applied only to LED output.
 - **Call-start effect:** a full-panel rainbow flow temporarily replaces the icon, then restores the status. It uses master brightness, not the relative status multiplier.
 - **Overnight behavior:** with no Live/Muted call, lock, inactive user session, display sleep, or system sleep blanks the matrix. It restores when you return. Other outputs are unchanged.
 - **Orientation:** gravity keeps artwork upright; offset/mirror options are in the collapsed calibration disclosure.
@@ -84,7 +84,9 @@ The three editable statuses use full palette intensity; relative sliders supply 
 
 The embedded gallery is **static** to keep browsing responsive. [Open the animated gallery on demand](Resources/matrix-gallery-animated.svg) to see AFK cycle A/F/K and Shrug scroll `¯\_(ツ)_/¯` right-to-left. The animated version can be GPU-intensive; close it when finished. Each board has exactly 64 simulated LEDs; glow is illustrative.
 
-For flashing, safety, CLI demos, calibration and the v3 USB protocol, see the [matrix guide](MATRIX.md).
+With **MicMatrix v4**, the board renders pulse, flash, AFK and Shrug locally. USB sends a preset when state/settings change and a small once-per-second keepalive, rather than streaming those animations. Disabled/blanked output has no matrix timer or discovery activity. The app still supports v3 firmware through frame streaming; temporary full-panel rainbow effects also remain streamed.
+
+For flashing, safety, CLI demos, calibration, the v4 USB protocol and measured performance, see the [matrix guide](MATRIX.md).
 
 ### Kuando and BlinkStick: USB status lights
 

@@ -132,13 +132,15 @@ APP="/Applications/Teams Mute Light.app/Contents/MacOS/TeamsMuteLight"
 
 CLI `off` remains supported for dark frames. In original palette mode, white means full palette intensity, not white artwork.
 
-## USB protocol v3
+## USB protocol v4
 
 115200 baud, ASCII newline-terminated commands:
 
 | Command | Reply |
 |---|---|
-| `HELLO` | `MATRIX 3 8 8 25`, only with healthy IMU |
+| `HELLO` | `MATRIX 4 8 8 25 PRESET1`, only with healthy IMU |
+| `PRESET seq icon style RRGGBB brightness flags relative effect rate effectPhase iconPhase` | `OK seq` |
+| `KEEP seq` | `OK seq`, only while the display lease is active |
 | `FRAME seq brightness flags rgb` | `OK seq` |
 | `DRAW seq r g b brightness flags bitmap` | `OK seq` |
 | `OFF seq` | `OK seq` |
@@ -152,12 +154,81 @@ CLI `off` remains supported for dark frames. In original palette mode, white mea
 - Flags: 0-7; bits 0-1 are clockwise offset, bit 2 is mirror.
 - Input line: maximum 448 bytes. USB receive buffer: 1024 bytes.
 - STATUS reports scaled output-buffer values, not source artwork.
+- PRESET icon: the saved/CLI identifier (including legacy `off`). Style: 0 original artwork, 1 tinted, 2 solid color.
+- Relative intensity: 0-10000 (0-100%, 0.01% resolution). Effect: 0 solid, 1 pulse, 2 flash. Rate: 100-10000 millihertz (0.1-10 Hz).
+- Phase offsets: unsigned 32-bit milliseconds, separately for the effect and icon animation. KEEP does not restart either phase. Presets explicitly carry current phases when state/settings change or a connection is restored.
 
-Parsing is atomic. Malformed input returns `ERR ...` without replacing the display or renewing its watchdog. Timeout blanks LEDs and emits `TIMEOUT`. HELLO, STATUS, ORIENTATION and orientation redraws do not renew the three-second timeout.
+Parsing is atomic. Malformed input returns `ERR ...` without replacing the display or renewing its watchdog. Timeout blanks LEDs and emits `TIMEOUT`. HELLO, STATUS, ORIENTATION, orientation redraws and local animation do not renew the three-second timeout. KEEP renews only an unexpired lease; it cannot relight an expired/OFF display. A new valid PRESET/FRAME/DRAW is required. Boot, OFF and IMU failure clear the display and stop its animation.
 
-The Mac app applies gamma/relative gain before FRAME transmission; firmware scales raw RGB and does not apply gamma again. Older handshake ceilings/protocol versions must be upgraded.
+PRESET applies the same palette/tint/solid selection, gamma-2.2 and relative gain on the board, then the existing master brightness cap. FRAME remains raw RGB: the app applies gamma/relative gain before transmission, and firmware does not apply gamma twice.
+
+The app recognizes v4's exact `PRESET1` capability handshake and v3's `MATRIX 3 8 8 25`. V3 uses legacy FRAME streaming. Earlier protocols/ceilings are rejected. **Install the matching updated app before flashing v4**: older app builds recognize only v3 and cannot control v4 firmware. Keep the verified original/current flash backup for rollback.
+
+### Control scheduling and safety design
+
+- **Steady state:** send one preset on changes; acknowledge and coalesce the latest desired state, with at most one command in flight. Send a small KEEP approximately once per second. There is no host 25 Hz timer for matrix-only presets.
+- **Transport:** serial read/write readiness events drain replies and resume partial writes. A 1 Hz maintenance timer handles heartbeat, handshake/ACK deadlines and reconnect. Discovery runs only when enabled and disconnected; connected ports report failures through I/O. Disabled, paused and automatically blanked outputs close the port and cancel maintenance.
+- **Firmware:** immutable artwork is generated from the existing Swift source, not a table of every effect/rate combination. Pulse/flash use formulas; AFK cycles every 800 ms; Shrug scrolls every 125 ms. Animated presets evaluate at up to 100 Hz, improving fast-flash timing; identical pixel buffers are not redrawn. Solid graphics redraw only on changes/orientation.
+- **Safety:** local rendering cannot renew the independent three-second host lease. Brightness, IMU stale-sample blanking, explicit OFF on release and bounded serial parsing remain enforced. The menu-bar pulse and Teams polling are deliberately unchanged.
+- **Bounded exception:** call-start/manual full-panel rainbow effects still stream frames at up to 25 Hz for their short duration, then restore the status preset. Other enabled software-animated USB outputs can still require the host timer; invisible/disabled outputs do not.
+
+After artwork changes, regenerate the firmware catalog before building/flashing:
+
+```bash
+bash scripts/generate-matrix-firmware-artwork.sh
+```
+
+The native test suite checks that the committed generated catalog matches the Swift source.
 
 ## Validation
+
+### Animation performance benchmark
+
+Build first, then quit the menu-bar app (or disable its matrix output) to release the port:
+
+```bash
+bash scripts/test-animation-performance.sh "D4:05:92:40:89:A0" 8
+# Optional third argument: JSON output path; default build/animation-performance.json.
+# Add a fourth argument --presets to require the v4 steady-state traffic/timer limits.
+```
+
+The CLI benchmark runs the real controller, effect renderer and serial driver with isolated in-memory settings, at 5% master brightness. It does not read/write saved settings or Keychain, run Teams detection, send to other lights, or lock the actual screen. Eight scenarios each have 1.5 seconds of warm-up before the timed sample. On v4, the Live case additionally plays a bounded rainbow before sampling and asserts that host animation stops after preset restoration. Menu-bar pulse timer activity is included for the Live scenario, but GUI image drawing and Settings rendering are not. The lock case injects the same availability state used by macOS notifications.
+
+JSON records elapsed time, process CPU time (`clock()`, percent of one CPU core), actual controller animation callbacks/render calls, acknowledged USB commands (the historical `acknowledgedFrames` field includes KEEP), successfully written bytes, driver maintenance timer callbacks, and discovery calls. Read/write readiness events are not counted as timer callbacks. Timer callbacks are **not** kernel wakeup counts. CPU includes the benchmark's run-loop harness and is not a measurement of battery power, whole-app GUI cost, Teams CPU, or firmware CPU. Timing/CPU vary with system load; assertions check functional traffic/rate bounds rather than brittle CPU thresholds.
+
+Initial physical-board baseline (2026-11-10, release build, eight seconds per scenario):
+
+| Scenario | Controller ticks/s | USB frames/s | USB bytes/s | Process CPU, one core |
+|---|---:|---:|---:|---:|
+| All outputs disabled, Pulse selected | 25 | 0 | 0 | 0.70% |
+| Matrix Solid | 0 | 1 | 398 | 0.66% |
+| Matrix Pulse, 1 Hz (Live) | 25 | 21 | 8,392 | 1.59% |
+| Matrix Flash, 1 Hz | 25 | 2 | 800 | 0.97% |
+| Matrix Flash, 10 Hz | 25 | 20 | 8,050 | 1.58% |
+| AFK, Solid | 25 | 1.25 | 500 | 0.90% |
+| Shrug, Solid | 25 | 7.87 | 3,149 | 1.14% |
+| Matrix blanked by simulated lock, Pulse selected | 25 | 0 | 0 | 0.72% |
+
+The original driver ran about 25 callbacks/s and one discovery/s in all cases. These short baseline samples confirmed unnecessary controller work without animated visible output, while frame coalescing already prevented a constant 25-fps USB stream.
+
+### Optimized physical-board results
+
+V4, same board/release build/5% brightness/eight-second samples (2026-11-10):
+
+| Scenario | Controller ticks/s | USB commands/s | USB bytes/s | Process CPU, one core |
+|---|---:|---:|---:|---:|
+| All outputs disabled, Pulse selected | 0 | 0 | 0 | 0.41% |
+| Matrix Solid | 0 | 1 | 7 | 0.43% |
+| Matrix Pulse, 1 Hz (Live) | 0 | 1 | 8 | 0.45% |
+| Matrix Flash, 1 Hz | 0 | 1 | 8 | 0.41% |
+| Matrix Flash, 10 Hz | 0 | 1 | 8 | 0.39% |
+| AFK, Solid | 0 | 1 | 8 | 0.40% |
+| Shrug, Solid | 0 | 1 | 8 | 0.42% |
+| Matrix blanked by simulated lock, Pulse selected | 0 | 0 | 0 | 0.40% |
+
+Enabled steady states used one maintenance callback/s and zero discovery calls. Disabled/blanked states used neither. Pulse traffic fell from about 8,392 to 8 bytes/s (over 99.9%); short-sample CPU fell from 1.59% to 0.45% of one core. This is not a battery-life claim. A separate physical test sampled STATUS during autonomous 10 Hz flashing and measured a 50.0 ms mean on/off edge interval (100 ms full cycle); it sends no frame updates. Firmware scheduling remains best-effort, not hard real-time. V3 compatibility was also measured before flashing: animated streaming remained functional, while idle/blanked controller timers and connected discovery were eliminated.
+
+### Functional and hardware tests
 
 ```bash
 bash scripts/test-matrix.sh
@@ -169,6 +240,6 @@ python3 scripts/test-matrix-hardware.py /dev/cu.usbmodem11401 --app "$APP"
 python3 scripts/test-matrix-hardware.py /dev/cu.usbmodem11401 --orientation-test
 ```
 
-The Swift/C++ tests need no XCTest or full Xcode. Hardware tests check handshake, IMU, busy-port errors, brightness floor/ceiling/zero, relative dimming, gamma-corrected red, watchdog, oversized/malformed input, 25 fps transport and all 64 independent RGB pixels.
+The Swift/C++ tests need no XCTest or full Xcode. Seventeen Swift tests, firmware parser/renderer/lease tests (including rollover), and 7,344 byte-exact cross-language render fixtures cover every selectable graphic, all styles/effects, multiple rates/phases/colors and relative gain. Hardware tests check handshake, IMU, busy-port errors, brightness floor/ceiling/zero, relative dimming, gamma-corrected red, watchdog, oversized/malformed input, 25 fps legacy transport and all 64 independent RGB pixels. V4 additionally tests local pulse/flash, KEEP phase preservation, atomic preset rejection and lease expiry despite ongoing animation/invalid traffic.
 
 Artwork is defined in [MatrixProtocol.swift](Sources/TeamsMuteLight/Outputs/MatrixProtocol.swift); the SVG generator uses the same source pixels. Physical orientation, lock/unlock restoration, call-start restoration, and menu-bar pulsing were also tested interactively.

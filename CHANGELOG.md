@@ -1,5 +1,14 @@
 # Release notes
 
+## Unreleased — device-control optimization
+
+- MicMatrix v4 renders all selectable graphics, pulse/flash and AFK/Shrug animations locally using generated canonical artwork and parameterized effects.
+- The app negotiates preset support, sends configuration only on changes, and maintains a small 1 Hz lease heartbeat. V3 firmware retains streamed-frame compatibility; temporary rainbow effects remain streamed.
+- Serial replies/writes use readiness events rather than 25 Hz polling. Discovery runs only while enabled and disconnected; disabled/automatically blanked output has no matrix maintenance timer.
+- Host animation stops when there is no visible output requiring software animation, including matrix-only presets. Teams detection and menu-bar pulse scheduling are unchanged.
+- Independent three-second stale-host blanking, IMU safety, orientation, gamma, brightness limits and saved settings are preserved.
+- Added reproducible hardware benchmarks, firmware preset/lease tests and 7,344 byte-exact Swift/firmware rendering comparisons. Install the matching updated app before using v4 firmware; older apps do not understand its handshake.
+
 ## v2.0.1 — 2026-11-07
 
 - New installs use a 9.0% matrix master brightness, intended for a light-diffusing case. Reduce brightness for exposed LEDs; the 10% safety ceiling is unchanged.

@@ -1,14 +1,26 @@
 import AppKit
+import Darwin
 import Combine
 import Security
 import ServiceManagement
 import SwiftUI
+
+private struct AnimationBenchmarkRow: Encodable {
+    let scenario: String
+    let seconds: Double
+    let cpuSeconds: Double
+    let cpuPercentOfOneCore: Double
+    let animationTicks: Int
+    let renderedFrames: Int
+    let usb: MatrixLight.Measurement
+}
 
 /// Ties detection to outputs. Main thread only.
 final class AppController: ObservableObject {
     @Published var settings: AppSettings {
         didSet {
             guard settings != oldValue else { return }
+            guard !isolatedMeasurement else { return }
             settings.save()
             settingsChanged(from: oldValue)
         }
@@ -57,6 +69,96 @@ final class AppController: ObservableObject {
     private var matrixAvailability = MatrixDisplayAvailability()
     private var matrixAutomaticallyBlanked = false
     private var menuBarPulseTimer: Timer?
+    private let isolatedMeasurement: Bool
+    private var animationTicks = 0
+    private var renderedFrames = 0
+
+    static func runAnimationBenchmark(seconds: Double, serial: String) throws {
+        var configuration = AppSettings()
+        configuration.kuando.enabled = false
+        configuration.blinkStick.enabled = false
+        configuration.homeAssistant.light.enabled = false
+        configuration.webhook.light.enabled = false
+        configuration.matrix.light.enabled = false
+        configuration.matrix.light.deviceSerial = serial
+        configuration.matrix.light.brightness = MatrixFrame.demoLevel
+        configuration.matrix.light.colors = StateColors(notInMeeting: .red, muted: .green,
+            unmuted: .red, unknown: .red)
+        configuration.matrix.brightnessLevels = .legacy
+        let controller = AppController(measurementSettings: configuration)
+        defer { controller.shutdown() }
+        let scenarios: [(String, Bool, MicState, MatrixIcon, LightEffect, Double, Bool)] = [
+            ("disabled-pulse", false, .notInMeeting, .dot, .pulse, 1, false),
+            ("matrix-solid", true, .muted, .dot, .solid, 1, false),
+            ("matrix-pulse-1hz", true, .unmuted, .dot, .pulse, 1, false),
+            ("matrix-flash-1hz", true, .muted, .dot, .flash, 1, false),
+            ("matrix-flash-10hz", true, .muted, .dot, .flash, 10, false),
+            ("matrix-afk-solid", true, .muted, .afk, .solid, 1, false),
+            ("matrix-shrug-solid", true, .muted, .shrug, .solid, 1, false),
+            ("locked-matrix-pulse", true, .notInMeeting, .dot, .pulse, 1, true),
+        ]
+        var rows: [AnimationBenchmarkRow] = []
+        func runLoop(for duration: Double) {
+            let until = ProcessInfo.processInfo.systemUptime + duration
+            while ProcessInfo.processInfo.systemUptime < until {
+                RunLoop.main.run(until: Date().addingTimeInterval(
+                    min(0.02, until - ProcessInfo.processInfo.systemUptime)))
+            }
+        }
+        for (name, enabled, state, icon, effect, rate, locked) in scenarios {
+            controller.stopAnimation()
+            controller.matrix.release()
+            controller.matrixAutomaticallyBlanked = false
+            controller.settings.matrix.light.enabled = enabled
+            controller.settings.matrix.icons[state] = icon
+            controller.settings.effects[state] = StateEffect(effect: effect, rateHz: rate)
+            controller.micState = state
+            controller.matrixAvailability = MatrixDisplayAvailability(locked: locked)
+            controller.configureOutputs()
+            controller.updateMenuBarPulse()
+            controller.phaseStart = Date()
+            controller.pushLights()
+            // Exclude discovery/handshake and previous-frame draining from steady-state samples.
+            runLoop(for: 1.5)
+            if name == "matrix-pulse-1hz", controller.matrix.supportsPresets {
+                controller.playRainbow(sweeps: 1, blackout: 0.1)
+                runLoop(for: controller.settings.rainbowDuration + 0.5)
+                guard controller.animationTimer == nil else {
+                    throw NSError(domain: "AnimationBenchmark", code: 3,
+                        userInfo: [NSLocalizedDescriptionKey: "Host animation did not stop after rainbow restoration"])
+                }
+            }
+            if enabled && !locked && !controller.matrix.statusText.hasPrefix("OK") {
+                throw NSError(domain: "AnimationBenchmark", code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "\(name): \(controller.matrix.statusText)"])
+            }
+            let before = controller.matrix.measurement()
+            let ticks = controller.animationTicks
+            let renders = controller.renderedFrames
+            let cpuStart = clock()
+            let start = ProcessInfo.processInfo.systemUptime
+            runLoop(for: seconds)
+            let elapsed = ProcessInfo.processInfo.systemUptime - start
+            let cpu = Double(clock() - cpuStart) / Double(CLOCKS_PER_SEC)
+            let after = controller.matrix.measurement()
+            if enabled && !locked && !controller.matrix.statusText.hasPrefix("OK") {
+                throw NSError(domain: "AnimationBenchmark", code: 2,
+                    userInfo: [NSLocalizedDescriptionKey: "\(name): \(controller.matrix.statusText)"])
+            }
+            rows.append(AnimationBenchmarkRow(scenario: name, seconds: elapsed, cpuSeconds: cpu,
+                cpuPercentOfOneCore: cpu / elapsed * 100,
+                animationTicks: controller.animationTicks - ticks,
+                renderedFrames: controller.renderedFrames - renders,
+                usb: MatrixLight.Measurement(transportTicks: after.transportTicks - before.transportTicks,
+                    discoveries: after.discoveries - before.discoveries,
+                    acknowledgedFrames: after.acknowledgedFrames - before.acknowledgedFrames,
+                    transmittedBytes: after.transmittedBytes - before.transmittedBytes)))
+        }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        FileHandle.standardOutput.write(try encoder.encode(rows))
+        FileHandle.standardOutput.write(Data("\n".utf8))
+    }
 
     private func updateMenuBarPulse() {
         guard micState == .unmuted && !paused else {
@@ -74,10 +176,19 @@ final class AppController: ObservableObject {
         menuBarPulseTimer = timer
     }
 
-    init() {
-        settings = AppSettings.load()
-        homeAssistantToken = Keychain.get(.homeAssistantToken) ?? ""
+    init(measurementSettings: AppSettings? = nil) {
+        isolatedMeasurement = measurementSettings != nil
+        settings = measurementSettings ?? AppSettings.load()
+        homeAssistantToken = measurementSettings == nil ? (Keychain.get(.homeAssistantToken) ?? "") : ""
         homeAssistant.token = homeAssistantToken
+        matrix.onChange = { [weak self] in
+            self?.objectWillChange.send()
+            self?.pushLights()
+        }
+        if isolatedMeasurement {
+            configureOutputs()
+            return
+        }
 
         teamsAPI.onChange = { [weak self] snap in
             self?.api = snap
@@ -90,7 +201,6 @@ final class AppController: ObservableObject {
         }
         HIDDeviceManager.shared.addObserver { [weak self] in self?.refreshDevices() }
         refreshDevices()
-        matrix.onChange = { [weak self] in self?.objectWillChange.send() }
 
         configureOutputs()
         configureDetection()
@@ -297,14 +407,21 @@ final class AppController: ObservableObject {
             return
         }
         let state = previewState ?? micState
-        let needsAnimation = rainbowUntil != nil || settings.effects[state].effect != .solid
-            || (settings.matrix.light.enabled && !matrixAvailability.shouldBlank(state: micState)
-                && settings.matrix.icons[state].isAnimated)
+        let needsAnimation = activeOutputs.contains { active in
+            if active.output === matrix {
+                guard !matrixAvailability.shouldBlank(state: micState) else { return false }
+                return rainbowUntil != nil || (matrix.connectedDevice != nil && !matrix.supportsPresets &&
+                    (settings.effects[state].effect != .solid || settings.matrix.icons[state].isAnimated))
+            }
+            return active.output.supportsAnimation &&
+                (rainbowUntil != nil || settings.effects[state].effect != .solid)
+        }
         if needsAnimation { startAnimation() } else { stopAnimation() }
         renderFrame(state: state, now: now)
     }
 
     private func renderFrame(state: MicState, now: Date) {
+        renderedFrames += 1
         let effect = settings.effects[state]
         let level = Effects.level(effect.effect, rateHz: effect.rateHz, t: now.timeIntervalSince(phaseStart))
         var rainbow: RGB?
@@ -336,6 +453,11 @@ final class AppController: ObservableObject {
                 continue
             }
             let base = a.config.colors[state]
+            if a.output === matrix {
+                matrix.applyStatus(state: state, color: base, brightness: brightness,
+                    effect: effect, phaseStart: phaseStart, now: now)
+                continue
+            }
             let color = a.output.supportsAnimation ? (rainbow ?? base.scaled(level)) : base
             a.output.apply(state: state, color: color, brightness: brightness)
         }
@@ -344,6 +466,7 @@ final class AppController: ObservableObject {
     private func startAnimation() {
         guard animationTimer == nil else { return }
         let t = Timer(timeInterval: Effects.frameInterval, repeats: true) { [weak self] _ in
+            self?.animationTicks += 1
             self?.pushLights()
         }
         RunLoop.main.add(t, forMode: .common)

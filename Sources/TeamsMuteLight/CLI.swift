@@ -14,6 +14,16 @@ enum CLI {
         guard let cmd = args.first else { usage() }
 
         switch cmd {
+        case "animation-benchmark":
+            guard args.count == 3, let seconds = Double(args[1]),
+                  seconds.isFinite, (3...60).contains(seconds), !args[2].isEmpty else { usage() }
+            Log.echoToStdout = false
+            do {
+                try AppController.runAnimationBenchmark(seconds: seconds, serial: args[2])
+            } catch {
+                fail("Animation benchmark failed: \(error.localizedDescription)")
+            }
+            exit(0)
         case "devices":
             let infos = HIDDeviceManager.shared.allInfos
             if infos.isEmpty { print("No supported USB lights found (Kuando 27BB:*, 04D8:F848, BlinkStick 20A0:41E5).") }
@@ -154,7 +164,12 @@ enum CLI {
 
     private static func testMatrix(_ matrix: MatrixLight, color: RGB, seconds: Double) {
         let previous = matrix.acknowledgedFrames
-        matrix.apply(state: .unmuted, color: color, brightness: MatrixFrame.demoLevel)
+        let phaseStart = Date()
+        func apply() {
+            matrix.applyStatus(state: .unmuted, color: color, brightness: MatrixFrame.demoLevel,
+                effect: StateEffect(effect: .solid, rateHz: 1), phaseStart: phaseStart, now: Date())
+        }
+        apply()
         let deadline = Date().addingTimeInterval(5)
         while matrix.acknowledgedFrames == previous && Date() < deadline {
             spin(0.05)
@@ -168,10 +183,11 @@ enum CLI {
             matrix.release()
             fail("Matrix test failed: \(matrix.statusText)")
         }
+        apply()
         let until = Date().addingTimeInterval(seconds)
         while Date() < until {
-            if matrix.icons[.unmuted].isAnimated {
-                matrix.apply(state: .unmuted, color: color, brightness: MatrixFrame.demoLevel)
+            if !matrix.supportsPresets && matrix.icons[.unmuted].isAnimated {
+                apply()
             }
             spin(min(0.05, until.timeIntervalSinceNow))
             guard matrix.connectedDevice != nil, matrix.statusText.hasPrefix("OK") else {
@@ -180,7 +196,7 @@ enum CLI {
                 fail("Matrix connection failed during test: \(error)")
             }
         }
-        if matrix.icons[.unmuted].isAnimated, seconds >= 1 {
+        if !matrix.supportsPresets, matrix.icons[.unmuted].isAnimated, seconds >= 1 {
             guard matrix.acknowledgedFrames > previous + 2 else {
                 matrix.release()
                 fail("Matrix animation did not acknowledge changing frames.")
@@ -198,6 +214,7 @@ enum CLI {
         print("""
         Usage: TeamsMuteLight --cli <command>
           devices                                   List HID lights and Espressif USB serial devices
+          animation-benchmark <seconds> <serial>    JSON controller/USB/CPU measurements, 3...60 s per scenario
           matrix-probe [serial]                     Verify MicMatrix firmware without lighting LEDs
           matrix-test [serial]                      Show five icons at 5%, then turn off
           matrix-rainbow [serial]                   Full-panel rainbow flow for 3 s at 5%, then off

@@ -6,6 +6,7 @@ enum MatrixTests {
         testBrightnessCeilingForAllInputLevels()
         testExactWireFormatAndBounds()
         testReplyParsing()
+        testPresetEncoding()
         testIconsAndStateSelection()
         try testLegacySettingsPreserveBusylightConfiguration()
         try testMatrixSettingsRoundTrip()
@@ -19,7 +20,7 @@ enum MatrixTests {
         testAutomaticDisplayBlanking()
         testMenuBarColors()
         try testFreshInstallDefaults()
-        print("Sixteen Swift matrix protocol, artwork, brightness, and effects tests passed.")
+        print("Seventeen Swift matrix protocol, artwork, brightness, and effects tests passed.")
     }
 
     static func testBrightnessCeilingForAllInputLevels() {
@@ -55,6 +56,7 @@ enum MatrixTests {
     }
 
     static func testReplyParsing() {
+        precondition(MatrixReply(line: "MATRIX 4 8 8 25 PRESET1") == .presets)
         precondition(MatrixReply(line: "MATRIX 3 8 8 25") == .hello)
         precondition(MatrixReply(line: "OK 4294967295") == .acknowledged(UInt32.max))
         precondition(MatrixReply(line: "ERR command") == .error("command"))
@@ -63,6 +65,15 @@ enum MatrixTests {
                      "OK 4294967296", "OK 1 extra", "boot diagnostics"] {
             precondition(MatrixReply(line: line) == nil)
         }
+
+    }
+
+    static func testPresetEncoding() {
+        let preset = MatrixPreset(icon: .shrug, style: .tinted, color: RGB(r: 255, g: 128, b: 0),
+            brightness: 13, flags: 7, relative: 7500, effect: .pulse, rateMilliHz: 250,
+            effectStart: 10, iconStart: 20)
+        precondition(String(decoding: preset.command(sequence: 42, now: 22, wallTime: 11),
+            as: UTF8.self) == "PRESET 42 shrug 1 FF8000 13 7 7500 1 250 1000 2000\n")
     }
 
     static func testIconsAndStateSelection() {

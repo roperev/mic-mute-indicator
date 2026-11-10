@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include "Artwork.h"
 
 namespace MatrixProtocol {
 constexpr uint8_t MaxBrightness = 25;
@@ -10,7 +11,7 @@ constexpr uint8_t MinBrightness = 3;
 constexpr uint32_t TimeoutMs = 3000;
 constexpr size_t MaxLine = 448;
 
-enum class Kind { Hello, Status, Orientation, Off, Draw, Frame };
+enum class Kind { Hello, Status, Orientation, Off, Draw, Frame, Preset, Keep };
 
 struct Command {
   Kind kind = Kind::Hello;
@@ -19,7 +20,41 @@ struct Command {
   bool mirrored = false;
   uint64_t bitmap = 0;
   uint8_t pixels[64][3] = {};
+  const MatrixArtwork::Icon* icon = nullptr;
+  uint8_t style = 0, effect = 0;
+  uint16_t relative = 10000, rateMilliHz = 1000;
+  uint32_t effectPhaseMs = 0, iconPhaseMs = 0;
 };
+
+struct DisplayLease {
+  bool active = false;
+  uint32_t renewedAt = 0;
+
+  bool valid(uint32_t now) const {
+    return active && uint32_t(now - renewedAt) < TimeoutMs;
+  }
+  void start(uint32_t now) {
+    active = true;
+    renewedAt = now;
+  }
+  void stop() { active = false; }
+  bool keep(uint32_t now) {
+    if (!valid(now)) {
+      stop();
+      return false;
+    }
+    renewedAt = now;
+    return true;
+  }
+};
+
+inline const MatrixArtwork::Icon* findIcon(const char* name) {
+  if (!name) return nullptr;
+  for (size_t i = 0; i < MatrixArtwork::IconCount; ++i) {
+    if (strcmp(name, MatrixArtwork::icons[i].name) == 0) return &MatrixArtwork::icons[i];
+  }
+  return nullptr;
+}
 
 inline uint8_t limitedBrightness(uint8_t value) {
   if (value == 0) return 0;
@@ -42,12 +77,16 @@ inline bool decimal(const char* text, uint32_t maximum, uint32_t& value) {
 }
 
 inline bool parse(char* line, Command& result) {
-  char* tokens[10] = {};
+  if (!line) return false;
+  size_t length = 0;
+  while (length <= MaxLine && line[length]) ++length;
+  if (length > MaxLine) return false;
+  char* tokens[12] = {};
   char* context = nullptr;
   size_t count = 0;
   for (char* token = strtok_r(line, " \r", &context); token;
        token = strtok_r(nullptr, " \r", &context)) {
-    if (count == 10) return false;
+    if (count == 12) return false;
     tokens[count++] = token;
   }
   if (count == 1 && strcmp(tokens[0], "HELLO") == 0) {
@@ -65,9 +104,41 @@ inline bool parse(char* line, Command& result) {
     return true;
   }
   Command command;
-  if (count == 2 && strcmp(tokens[0], "OFF") == 0) {
+  if (count == 2 &&
+      (strcmp(tokens[0], "OFF") == 0 || strcmp(tokens[0], "KEEP") == 0)) {
     if (!decimal(tokens[1], UINT32_MAX, command.sequence)) return false;
-    command.kind = Kind::Off;
+    command.kind = strcmp(tokens[0], "OFF") == 0 ? Kind::Off : Kind::Keep;
+  } else if (count == 12 && strcmp(tokens[0], "PRESET") == 0) {
+    uint32_t style, brightness, flags, relative, effect, rate;
+    command.icon = findIcon(tokens[2]);
+    if (!decimal(tokens[1], UINT32_MAX, command.sequence) || !command.icon ||
+        !decimal(tokens[3], 2, style) || strlen(tokens[4]) != 6 ||
+        !decimal(tokens[5], 255, brightness) || !decimal(tokens[6], 7, flags) ||
+        !decimal(tokens[7], 10000, relative) || !decimal(tokens[8], 2, effect) ||
+        !decimal(tokens[9], 10000, rate) || rate < 100 ||
+        !decimal(tokens[10], UINT32_MAX, command.effectPhaseMs) ||
+        !decimal(tokens[11], UINT32_MAX, command.iconPhaseMs)) return false;
+    uint8_t color[3] = {};
+    for (size_t i = 0; i < 6; ++i) {
+      const char c = tokens[4][i];
+      uint8_t nibble;
+      if (c >= '0' && c <= '9') nibble = c - '0';
+      else if (c >= 'a' && c <= 'f') nibble = c - 'a' + 10;
+      else if (c >= 'A' && c <= 'F') nibble = c - 'A' + 10;
+      else return false;
+      color[i / 2] = (color[i / 2] << 4) | nibble;
+    }
+    command.kind = Kind::Preset;
+    command.style = style;
+    command.red = color[0];
+    command.green = color[1];
+    command.blue = color[2];
+    command.brightness = limitedBrightness(brightness);
+    command.rotation = flags & 3;
+    command.mirrored = (flags & 4) != 0;
+    command.relative = relative;
+    command.effect = effect;
+    command.rateMilliHz = rate;
   } else if (count == 5 && strcmp(tokens[0], "FRAME") == 0) {
     uint32_t brightness, flags;
     if (!decimal(tokens[1], UINT32_MAX, command.sequence) ||

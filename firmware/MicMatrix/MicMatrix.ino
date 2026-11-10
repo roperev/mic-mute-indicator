@@ -3,13 +3,17 @@
 #include <Wire.h>
 #include "Protocol.h"
 #include "Orientation.h"
+#include "Renderer.h"
 
 Adafruit_NeoPixel pixels(64, 14, NEO_RGB + NEO_KHZ800);
 char inputLine[MatrixProtocol::MaxLine + 1];
 size_t inputLength = 0;
 bool discarding = false;
-bool displaying = false;
-uint32_t lastDraw = 0;
+MatrixProtocol::DisplayLease displayLease;
+MatrixProtocol::PresetClock presetClock;
+uint32_t lastRender = 0;
+uint8_t renderedPixels[64][3] = {};
+bool haveRendered = false;
 SensorQMI8658 imu;
 MatrixProtocol::Orientation orientation;
 MatrixProtocol::Command currentFrame;
@@ -22,30 +26,56 @@ bool imuHealthy() {
   return imuInitialized && haveSample && uint32_t(millis() - lastSample) < 600;
 }
 
-void renderFrame() {
-  pixels.clear();
+void showFrame(const uint8_t frame[64][3]) {
+  if (haveRendered && memcmp(frame, renderedPixels, sizeof(renderedPixels)) == 0) return;
+  for (uint8_t i = 0; i < 64; ++i) {
+    pixels.setPixelColor(i, frame[i][0], frame[i][1], frame[i][2]);
+  }
+  pixels.show();
+  memcpy(renderedPixels, frame, sizeof(renderedPixels));
+  haveRendered = true;
+}
+
+void renderFrame(uint32_t now) {
+  presetClock.update(now);
+  uint8_t preset[64][3];
+  const uint8_t (*source)[3] = currentFrame.pixels;
+  if (currentFrame.kind == MatrixProtocol::Kind::Preset) {
+    MatrixProtocol::renderPreset(currentFrame, presetClock.elapsedMs, preset);
+    source = preset;
+  }
+  uint8_t frame[64][3] = {};
   const uint8_t rotation = MatrixProtocol::effectiveRotation(
     orientation.quarterTurn, currentFrame.rotation, currentFrame.mirrored);
   for (uint8_t y = 0; y < 8; ++y) {
     for (uint8_t x = 0; x < 8; ++x) {
-      const uint8_t* rgb = currentFrame.pixels[y * 8 + x];
-      pixels.setPixelColor(
-          MatrixProtocol::pixelIndex(currentFrame.mirrored ? 7 - x : x, y, rotation),
-          MatrixProtocol::scaled(rgb[0], currentFrame.brightness),
-          MatrixProtocol::scaled(rgb[1], currentFrame.brightness),
-          MatrixProtocol::scaled(rgb[2], currentFrame.brightness));
+      const uint8_t* rgb = source[y * 8 + x];
+      const uint8_t index = MatrixProtocol::pixelIndex(
+        currentFrame.mirrored ? 7 - x : x, y, rotation);
+      for (uint8_t channel = 0; channel < 3; ++channel) {
+        frame[index][channel] = MatrixProtocol::scaled(rgb[channel], currentFrame.brightness);
+      }
     }
   }
-  pixels.show();
+  showFrame(frame);
+  lastRender = now;
 }
 
 void clearDisplay() {
-  pixels.clear();
-  pixels.show();
-  displaying = false;
+  const uint8_t blank[64][3] = {};
+  showFrame(blank);
+  displayLease.stop();
+}
+
+void expireDisplay(uint32_t now) {
+  if (displayLease.active && !displayLease.valid(now)) {
+    clearDisplay();
+    Serial.println("TIMEOUT");
+  }
 }
 
 void processLine() {
+  expireDisplay(millis());
   if (inputLength == 0) return;
   inputLine[inputLength] = '\0';
   MatrixProtocol::Command command;
@@ -54,7 +84,7 @@ void processLine() {
     return;
   }
   if (command.kind == MatrixProtocol::Kind::Hello) {
-    Serial.println(imuHealthy() ? "MATRIX 3 8 8 25" : "ERR imu-unavailable");
+    Serial.println(imuHealthy() ? "MATRIX 4 8 8 25 PRESET1" : "ERR imu-unavailable");
     return;
   }
   if (command.kind == MatrixProtocol::Kind::Orientation) {
@@ -81,6 +111,22 @@ void processLine() {
   }
   if (command.kind == MatrixProtocol::Kind::Off) {
     clearDisplay();
+  } else if (command.kind == MatrixProtocol::Kind::Keep) {
+    if (!displayLease.valid(millis())) {
+      clearDisplay();
+      Serial.println("ERR inactive");
+      return;
+    }
+    if (!imuHealthy()) {
+      clearDisplay();
+      Serial.println("ERR imu-unavailable");
+      return;
+    }
+    if (!displayLease.keep(millis())) {
+      clearDisplay();
+      Serial.println("ERR inactive");
+      return;
+    }
   } else {
     if (!imuHealthy()) {
       clearDisplay();
@@ -88,9 +134,10 @@ void processLine() {
       return;
     }
     currentFrame = command;
-    renderFrame();
-    displaying = true;
-    lastDraw = millis();
+    const uint32_t now = millis();
+    presetClock.reset(now);
+    displayLease.start(now);
+    renderFrame(now);
   }
   Serial.printf("OK %lu\n", static_cast<unsigned long>(command.sequence));
 }
@@ -111,6 +158,8 @@ void setup() {
 
 void loop() {
   const uint32_t now = millis();
+  presetClock.update(now);
+  expireDisplay(now);
   if (imuInitialized && uint32_t(now - lastImuPoll) >= 40) {
     lastImuPoll = now;
     AccelerometerData acceleration;
@@ -122,11 +171,13 @@ void loop() {
       if (isfinite(accelX) && isfinite(accelY) && isfinite(accelZ)) {
         haveSample = true;
         lastSample = now;
-        if (orientation.update(accelX, accelY, accelZ, now) && displaying) renderFrame();
+        if (orientation.update(accelX, accelY, accelZ, now) && displayLease.valid(now)) {
+          renderFrame(now);
+        }
       }
     }
   }
-  if (displaying && !imuHealthy()) {
+  if (displayLease.active && !imuHealthy()) {
     clearDisplay();
     Serial.println("ERR imu-unavailable");
   }
@@ -149,9 +200,11 @@ void loop() {
       }
     }
   }
-  if (displaying && uint32_t(millis() - lastDraw) >= MatrixProtocol::TimeoutMs) {
-    clearDisplay();
-    Serial.println("TIMEOUT");
+  const uint32_t renderNow = millis();
+  expireDisplay(renderNow);
+  if (displayLease.valid(renderNow) && MatrixProtocol::presetAnimated(currentFrame) &&
+      uint32_t(renderNow - lastRender) >= MatrixProtocol::AnimationIntervalMs) {
+    renderFrame(renderNow);
   }
   delay(1);
 }

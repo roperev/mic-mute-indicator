@@ -420,13 +420,41 @@ struct MatrixFrame: Equatable {
     }
 }
 
+struct MatrixPreset: Equatable {
+    let icon: MatrixIcon
+    let style: MatrixColorStyle
+    let color: RGB
+    let brightness: Int
+    let flags: Int
+    let relative: Int
+    let effect: LightEffect
+    let rateMilliHz: Int
+    let effectStart: TimeInterval
+    let iconStart: TimeInterval
+
+    func command(sequence: UInt32, now: TimeInterval,
+                 wallTime: TimeInterval = Date().timeIntervalSinceReferenceDate) -> Data {
+        let styleID = style == .artwork ? 0 : style == .tinted ? 1 : 2
+        let effectID = effect == .solid ? 0 : effect == .pulse ? 1 : 2
+        func phase(_ elapsed: TimeInterval) -> UInt32 {
+            UInt32(max(0, (elapsed * 1000).rounded(.down))
+                .truncatingRemainder(dividingBy: Double(UInt32.max) + 1))
+        }
+        return Data(("PRESET \(sequence) \(icon.rawValue) \(styleID) \(color.hex.dropFirst()) " +
+            "\(brightness) \(flags) \(relative) \(effectID) \(rateMilliHz) " +
+            "\(phase(wallTime - effectStart)) \(phase(now - iconStart))\n").utf8)
+    }
+}
+
 enum MatrixReply: Equatable {
     case hello
+    case presets
     case acknowledged(UInt32)
     case timeout
     case error(String)
 
     init?(line: String) {
+        if line == "MATRIX 4 8 8 25 PRESET1" { self = .presets; return }
         if line == "MATRIX 3 8 8 25" { self = .hello; return }
         if line == "TIMEOUT" { self = .timeout; return }
         if line.hasPrefix("ERR ") { self = .error(String(line.dropFirst(4))); return }

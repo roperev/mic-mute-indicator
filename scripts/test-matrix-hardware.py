@@ -76,10 +76,73 @@ def main():
         termios.tcflush(fd, termios.TCIOFLUSH)
         fcntl.ioctl(fd, termios.TIOCMBIS, struct.pack("I", termios.TIOCM_DTR))
         send("HELLO")
-        expect("MATRIX ", "MATRIX 3 8 8 25")
+        handshake = expect("MATRIX ")
+        if handshake not in ("MATRIX 3 8 8 25", "MATRIX 4 8 8 25 PRESET1"):
+            raise AssertionError(f"Unsupported firmware: {handshake}")
         identified = True
         state("STATE 0 0 0 0")
         print("Verified firmware handshake and dark startup.")
+        if handshake.endswith("PRESET1"):
+            send("KEEP 200")
+            expect("ERR ", "ERR inactive")
+            send("PRESET 201 dot 2 FF0000 13 0 10000 0 1000 0 0")
+            expect("OK ", "OK 201")
+            state("STATE 12 13 0 0")
+            send("PRESET 202 dot 2 FF0000 13 0 10001 0 1000 0 0")
+            expect("ERR ", "ERR command")
+            state("STATE 12 13 0 0")
+            send("PRESET 203 dot 2 FF0000 13 0 10000 2 1000 0 0")
+            expect("OK ", "OK 203")
+            observed = set()
+            started = time.monotonic()
+            while time.monotonic() - started < 1.3:
+                # Frequent KEEP must not restart the flash phase.
+                send("KEEP 204")
+                expect("OK ", "OK 204")
+                send("STATUS")
+                observed.add(expect("STATE "))
+                time.sleep(0.07)
+            if observed != {"STATE 12 13 0 0", "STATE 0 0 0 0"}:
+                raise AssertionError(f"Firmware flash/phase preservation failed: {observed}")
+            send("PRESET 208 dot 2 FF0000 13 0 10000 2 10000 0 0")
+            expect("OK ", "OK 208")
+            edges = []
+            previous = None
+            started = time.monotonic()
+            while time.monotonic() - started < 1.1:
+                send("STATUS")
+                current = expect("STATE ")
+                if previous is not None and current != previous:
+                    edges.append(time.monotonic())
+                previous = current
+                time.sleep(0.004)
+            if len(edges) < 16:
+                raise AssertionError(f"10 Hz local flashing was undersampled or too slow: {len(edges)} edges")
+            half_period = (edges[-1] - edges[0]) / (len(edges) - 1)
+            if not 0.04 <= half_period <= 0.06:
+                raise AssertionError(f"10 Hz flash edge interval outside tolerance: {half_period:.4f}s")
+            print(f"Verified 10 Hz local flash timing: mean edge interval {half_period * 1000:.1f} ms.")
+            send("PRESET 205 dot 2 FF0000 13 0 10000 1 1000 0 0")
+            expect("OK ", "OK 205")
+            peaks = set()
+            started = time.monotonic()
+            while time.monotonic() - started < 1.2:
+                send("STATUS")
+                peaks.add(int(expect("STATE ").split()[2]))
+                time.sleep(0.07)
+            if len(peaks) < 3 or max(peaks) > 13:
+                raise AssertionError(f"Firmware pulse did not animate within the brightness cap: {peaks}")
+            # STATUS, invalid commands and local animation must not renew this lease.
+            while time.monotonic() - started < 3.4:
+                send("KEEP invalid")
+                expect("ERR ", "ERR command")
+                time.sleep(0.1)
+            state("STATE 0 0 0 0")
+            send("KEEP 206")
+            expect("ERR ", "ERR inactive")
+            send("OFF 207")
+            expect("OK ", "OK 207")
+            print("Verified firmware presets, atomic rejection, local pulse/flash, KEEP phase preservation, and independent lease expiry.")
         send("ORIENTATION")
         telemetry = expect("ORIENT ").split()
         if len(telemetry) != 6:
@@ -143,7 +206,7 @@ def main():
         checked_before_timeout = False
         while time.monotonic() - started < 3.4:
             send("HELLO")
-            expect("MATRIX ", "MATRIX 3 8 8 25")
+            expect("MATRIX ", handshake)
             send("DRAW 4 256 0 0 51 0 0000183C3C180000")
             expect("ERR ", "ERR command")
             if not checked_before_timeout and time.monotonic() - started >= 2.4:
