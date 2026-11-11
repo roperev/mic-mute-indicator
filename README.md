@@ -1,4 +1,4 @@
-# Teams Mute Light v3.0.0
+# Teams Mute Light v3.0.1
 
 A macOS menu-bar app that shows **Microsoft Teams mute state**, not just microphone activity, on USB lights, an 8x8 RGB matrix, or a Home Assistant light.
 
@@ -27,6 +27,8 @@ open "/Applications/Teams Mute Light.app"
 ```
 
 Open **Settings...** from the status beacon in the menu bar.
+
+Check **General > Version** for **3.0.1** to confirm the updated app is running. Settings retains its original SwiftUI-managed appearance with a fixed 760 x 1030-point content area, 350 points taller than before. The window is not resizable; tabs remain scrollable when their content exceeds the window.
 
 | State | Existing menu-bar symbol | Color |
 |---|---|---|
@@ -150,7 +152,7 @@ Edit the label regexes in Advanced for other languages or changed Teams labels. 
 - For local matrix animation, install v3.0.0 before flashing MicMatrix v4 (`MATRIX 4 8 8 25 PRESET1`). Older app releases do not recognize that handshake. Existing MicMatrix v3 (`MATRIX 3 8 8 25`) remains supported through frame streaming; earlier protocols/ceilings require an upgrade. Back up and verify the board flash first; see the [matrix guide](MATRIX.md#build-and-flash).
 - Shield selections display Adobe A; saved `shield` and `off` identifiers remain supported. Off is no longer in the chooser; Warning replaces it.
 - Unavailable overrides old Unavailable icon/color/level choices with a fixed warning. Lock/sleep blanking still applies.
-- App release **3.0.0**, Teams API protocol **2.0.0**, and matrix wire protocol **v4** (with v3 compatibility) are separate version numbers.
+- App release **3.0.1**, Teams API protocol **2.0.0**, and matrix wire protocol **v4** (with v3 compatibility) are separate version numbers.
 
 ```bash
 bash scripts/test-matrix.sh
@@ -159,6 +161,8 @@ bash build.sh
 ```
 
 The 17 standalone Swift tests and C++ tests work with Command Line Tools alone. They cover defaults/migration, artwork, gamma, brightness, animations, lock/sleep policy, menu-bar colors, protocol parsing, orientation and lease rollover. Another 7,344 byte-exact comparisons verify Swift/firmware rendering parity. [Physical USB tests and performance benchmarks](MATRIX.md#validation) are optional.
+
+Run `bash scripts/test-settings-window.sh` in a logged-in macOS desktop session to open the SwiftUI-managed Settings scene and verify its fixed 760 x 1030-point content size without loading or changing saved settings.
 
 ## Troubleshooting
 

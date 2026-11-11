@@ -1,5 +1,12 @@
 # Release notes
 
+## v3.0.1 — 2026-11-11
+
+- Bumped the app version to 3.0.1 (build 5), visible in Settings > General, to distinguish the updated installed app.
+- Retained the original SwiftUI-managed Settings appearance and increased its fixed content height from 680 to 1030 points, keeping the 760-point width. The window is intentionally not resizable.
+- Removed the experimental native-window resize implementation. An automated Settings-scene test checks the actual 760 x 1030-point content size.
+- No firmware, saved-settings, detection, or light-output behavior changes.
+
 ## v3.0.0 — 2026-11-10
 
 ### Device-control optimization

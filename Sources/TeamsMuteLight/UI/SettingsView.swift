@@ -8,7 +8,7 @@ struct SettingsView: View {
             EffectsTab().tabItem { Label("Effects", systemImage: "sparkles") }
             AdvancedTab().tabItem { Label("Advanced", systemImage: "slider.horizontal.3") }
         }
-        .frame(width: 760, height: 680)
+        .frame(width: 760, height: 1030)
     }
 }
 
