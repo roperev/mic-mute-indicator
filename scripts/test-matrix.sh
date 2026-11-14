@@ -9,6 +9,8 @@ swiftc Sources/TeamsMuteLight/Models.swift \
 build/matrix-swift-tests
 c++ -std=c++11 -Wall -Wextra -Werror firmware/tests/protocol.cpp -o build/matrix-protocol-tests
 build/matrix-protocol-tests
+c++ -std=c++11 -Wall -Wextra -Werror firmware/tests/standalone.cpp -o build/matrix-standalone-tests
+build/matrix-standalone-tests
 bash scripts/generate-matrix-firmware-artwork.sh build/Artwork.h
 cmp build/Artwork.h firmware/MicMatrix/Artwork.h
 swiftc Sources/TeamsMuteLight/Models.swift Sources/TeamsMuteLight/Effects.swift \

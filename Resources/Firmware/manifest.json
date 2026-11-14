@@ -3,7 +3,9 @@
   "chip": "esp32s3",
   "flashSize": 4194304,
   "protocol": 4,
-  "buildID": "e6afc4110db1001ce8446b6b35213d0dd25d307f9c02e954cef614414e81a65e",
+  "buildID": "4216ff46f979100b68d885a8d07254a7e6ee93872e47976bec9d6778787bab8b",
+  "builtAt": "2026-11-14T20:55:19Z",
   "image": "micmatrix.bin",
-  "sha256": "d952e5b27acd0ebf4be36bb0c252dc9f3382462de3bc0f6107de3b390d7871c3"
+  "sha256": "8a6faa24327401c97c95611cfe2368b35371d10831007c244de6cdee94c5b030",
+  "firmwareVersion": "4.0.3"
 }

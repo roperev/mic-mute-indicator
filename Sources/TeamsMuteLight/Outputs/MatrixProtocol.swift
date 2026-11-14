@@ -14,11 +14,11 @@ struct MatrixDisplayAvailability {
 
 enum MatrixIcon: String, Codable, CaseIterable, Identifiable {
     case microphone, mutedMicrophone, fire, prohibited, check, dot, orientation, off
-    case heart, shield, rainbow, headphones, moon
+    case heart, shield, rainbow, headphones, moon, triforce, mushroom
     case afk, smiley, shrug
     case warning
     static let allCases: [MatrixIcon] = [.microphone, .mutedMicrophone, .fire, .prohibited,
-        .check, .dot, .orientation, .warning, .heart, .shield, .rainbow, .headphones, .moon,
+        .check, .dot, .mushroom, .warning, .heart, .shield, .rainbow, .headphones, .moon,
         .afk, .smiley, .shrug]
     var id: String { rawValue }
 
@@ -31,6 +31,7 @@ enum MatrixIcon: String, Codable, CaseIterable, Identifiable {
         case .check: return "Check"
         case .dot: return "Dot"
         case .orientation: return "Up arrow + lower-left dot"
+        case .triforce, .mushroom: return "Pixel mushroom"
         case .off: return "Off"
         case .warning: return "Warning"
         case .heart: return "Heart"
@@ -54,7 +55,7 @@ enum MatrixIcon: String, Codable, CaseIterable, Identifiable {
         case .dot: return 0x0000183C3C180000
         case .orientation: return 0x183C7E1818181880
         case .off: return 0
-        case .heart, .shield, .rainbow, .headphones, .moon, .prohibited, .afk, .smiley, .shrug, .warning:
+        case .heart, .shield, .rainbow, .headphones, .moon, .prohibited, .afk, .smiley, .shrug, .warning, .triforce, .mushroom:
             return artwork.enumerated().reduce(UInt64(0)) { result, entry in
                 entry.element.isOff ? result : result | (UInt64(1) << (63 - entry.offset))
             }
@@ -85,6 +86,8 @@ enum MatrixIcon: String, Codable, CaseIterable, Identifiable {
             rows = ["........", "...DD...", "..DRRD..", ".DRSSRD.", ".DRSSRD.", "..DRRD..", "...DD...", "........"]
         case .orientation:
             rows = ["...WW...", "..WCCW..", ".WCCCCW.", "...CC...", "...CC...", "...CC...", "...CC...", "O......."]
+        case .triforce, .mushroom:
+            rows = ["...RR...", "..RWWR..", ".RRWWRR.", "RRRRWWRR", "RRRRRRRR", "..WWWW..", "..WWWW..", "........"]
         case .heart:
             rows = ["........", ".PP..RR.", "PWWPRRRR", "PPRRRRRR", ".PRRRRR.", "..RRRR..", "...RR...", "........"]
         case .shield:
@@ -305,6 +308,9 @@ struct MatrixConfig: Codable, Equatable {
         light.brightness = light.brightness.isFinite
             ? LightBrightness.clamped(light.brightness, maximum: MatrixFrame.maxLevel) : d.light.brightness
         icons = try c.decodeIfPresent(MatrixIcons.self, forKey: .icons) ?? d.icons
+        for state in MicState.allCases where icons[state] == .orientation || icons[state] == .triforce {
+            icons[state] = .mushroom
+        }
         rotation = max(0, min(3, try c.decodeIfPresent(Int.self, forKey: .rotation) ?? d.rotation))
         mirrored = try c.decodeIfPresent(Bool.self, forKey: .mirrored) ?? d.mirrored
         fullColor = try c.decodeIfPresent(Bool.self, forKey: .fullColor) ?? d.fullColor
@@ -446,9 +452,24 @@ struct MatrixPreset: Equatable {
     }
 }
 
+struct MatrixFirmwareInfo: Equatable {
+    let version: String
+    let protocolVersion: Int
+    var buildID: String? = nil
+    var builtAt: String? = nil
+
+    static func readyDescription(info: MatrixFirmwareInfo?, protocolVersion: Int) -> String {
+        if let info, info.protocolVersion == protocolVersion {
+            return "MicMatrix Firmware v\(info.version) (protocol \(protocolVersion) support) installed · ready"
+        }
+        return "MicMatrix Firmware installed (protocol \(protocolVersion) support) · version not reported · ready"
+    }
+}
+
 enum MatrixReply: Equatable {
     case hello
     case presets
+    case firmware(MatrixFirmwareInfo)
     case acknowledged(UInt32)
     case timeout
     case error(String)
@@ -463,6 +484,29 @@ enum MatrixReply: Equatable {
         if line == "TIMEOUT" { self = .timeout; return }
         if line.hasPrefix("ERR ") { self = .error(String(line.dropFirst(4))); return }
         let parts = line.split(separator: " ")
+        if (parts.count == 4 || parts.count == 6), parts[0] == "FIRMWARE", parts[1] == "MicMatrix" {
+            let version = parts[2].split(separator: ".", omittingEmptySubsequences: false)
+            guard version.count == 3,
+                  version.allSatisfy({ !$0.isEmpty && $0.count <= 10 &&
+                      $0.allSatisfy({ $0 >= "0" && $0 <= "9" }) && UInt32($0) != nil }),
+                  parts[3].allSatisfy({ $0 >= "0" && $0 <= "9" }),
+                  let protocolVersion = Int(parts[3]), (1...255).contains(protocolVersion) else {
+                return nil
+            }
+            var info = MatrixFirmwareInfo(version: String(parts[2]), protocolVersion: protocolVersion)
+            if parts.count == 6 {
+                let buildID = String(parts[4])
+                let builtAt = String(parts[5])
+                let formatter = ISO8601DateFormatter()
+                guard buildID.count == 64, buildID.allSatisfy(\.isHexDigit),
+                      let date = formatter.date(from: builtAt),
+                      formatter.string(from: date) == builtAt else { return nil }
+                info.buildID = buildID.lowercased()
+                info.builtAt = builtAt
+            }
+            self = .firmware(info)
+            return
+        }
         if parts.count == 2, parts[0] == "OK",
            parts[1].allSatisfy({ $0 >= "0" && $0 <= "9" }),
            let sequence = UInt32(parts[1]) {

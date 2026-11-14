@@ -15,11 +15,14 @@ The tested board uses **RGB**, not the font example's GRB order. Pixel wiring is
 | New-install master | **9.0%**, intended for a diffusing case |
 | Master slider | **1-10%** |
 | Firmware nonzero floor | `3/255` |
-| Firmware maximum | `25/255`, approximately **9.8%** |
+| App-controlled firmware maximum | `25/255`, approximately **9.8%** |
+| Power-only standalone demo | `51/255`, **20% absolute output**, independent of saved app brightness |
 | Editable status multipliers | **0-100%** of master |
 | CLI hardware demos | **5%**, independent of saved master |
 
 **Waveshare warns that excessive brightness can damage the board.** A case may reduce perceived light without reducing heat. Begin around 2% for exposed LEDs, avoid sustained full-panel white, and unplug unusually hot hardware. The ceiling is a precaution, not a thermal guarantee.
+
+Firmware v4.0.1 adds a sparse, single-color-per-letter standalone demo at 20% absolute brightness, above the app-controlled 10% cap. White characters drive all three channels. This is not a thermal guarantee; do not leave the board running if it gets unusually hot.
 
 Gamma-2.2 converts display-encoded colors to linear LED intensities. Relative status gain is applied afterward; firmware then scales every channel by master PWM. Relative dimming can go below the master's floor, and zero remains off. Eight-bit precision can hide weak channels or cause color steps. On-screen previews show normalized source colors, not physical output.
 
@@ -29,16 +32,20 @@ The finished `.app` includes the firmware image and standalone flashing helper. 
 
 ### Detection and status
 
-Open **General > Matrix firmware** even when the light output is disabled:
+Open **General > Matrix firmware** even when the light output is disabled. The section starts collapsed with its title and compact Ready/attention/not-connected status on one line. Expanded details are grouped into Device, Installed firmware, Available to install, and Backup & restore, with separate metadata and action rows:
 
 | Status | Meaning |
 |---|---|
-| Green/checkmark | Recognized healthy MicMatrix; protocol and build information are shown when actually known |
+| Green/checkmark | Recognized healthy MicMatrix. Version-reporting firmware shows **MicMatrix Firmware v4.0.0 (protocol 4 support) installed · ready**; older firmware explicitly says **version not reported**. |
 | Blue/information | Known original-stock executable fingerprint, or explicitly **Possibly stock — firmware not recognized** when evidence is inconclusive |
 | Yellow/warning | Positive alternate/incompatible firmware evidence, hardware errors or an operation needing attention. MicroPython is recognized conservatively from validated executable/DROM runtime signatures; arbitrary nonmatching images remain unrecognized. |
 | Bootloader/connection state | Inspection or recovery may need BOOT/RESET; this is not proof of stock or alternate firmware |
 
 A silent USB device is not proof of stock firmware. A matching Espressif vendor/product ID is not proof of the Waveshare board model. An original factory-image fingerprint can recognize that known image, not every vendor batch. Build versions are not invented for old firmware that does not report them.
+
+The green installed-version line comes from the board's firmware response, not from the app version, chip identity or bundled-image label. **Bundled MicMatrix build** describes the image available to install, which may differ from what the board runs. Expanded details show the board-reported source build ID and UTC build timestamp as well as the bundled image's timestamp. Older builds may report only version/protocol or no version; missing fields are shown as Not reported.
+
+Firmware version is maintained in `firmware/MicMatrix/Version.h`. `tools/firmware/prepare.py` generates `BuildInfo.h` with a UTC timestamp and source hash, excluding the generated header from its own hash. The packaging manifest records those same values. Installation verifies the complete board-reported version/protocol/build ID/timestamp before declaring success; runtime replies are not synthesized from the manifest. Rebuild through the preparation tool to refresh the build date.
 
 USB attach/detach observations and bounded handshake checks populate the panel without permanent fast discovery polling. **Inspect firmware** is explicitly disruptive: it resets into download mode, verifies the chip/MAC/flash size and inspects firmware evidence without writing flash.
 
@@ -173,7 +180,7 @@ The [gallery](Resources/matrix-gallery.svg) has 16 choices and 48 previews:
 
 The default gallery is static. The [animated gallery](Resources/matrix-gallery-animated.svg) is a separate, opt-in view; it can be GPU-intensive. `generate-matrix-gallery.sh` regenerates both versions from the same artwork. Static AFK shows A; static Shrug shows its central glyphs rather than an empty first frame.
 
-Microphone, Muted microphone, Fire, No sign, Check, Dot, Orientation arrow, Warning, Heart, Adobe A, Rainbow, Headphones, Moon, AFK, Smiley, Shrug.
+Microphone, Muted microphone, Fire, No sign, Check, Dot, Pixel mushroom, Warning, Heart, Adobe A, Rainbow, Headphones, Moon, AFK, Smiley, Shrug.
 
 - **Full color** (formerly Original palette): preserves artwork hue; saved color's strongest channel determines palette gain. Fresh defaults use full gain.
 - **Tint artwork:** multiplies RGB channels by the tint; complementary colors may disappear.
@@ -195,13 +202,31 @@ When detection is neither Live nor Muted, macOS screen lock, inactive session, d
 
 Actual call states are exempt from lock/display-sleep blanking. During system sleep, USB updates stop and the watchdog clears stale output regardless. Previews and rainbow tests cannot override no-call automatic blanking. Other outputs keep their existing behavior.
 
+### Power-only demo (firmware v4.0.3)
+
+On a USB charger or power bank without a USB data host, the board waits **10 seconds from boot**, then displays **`MIC_MATRIX_v4.0.3`** one character at a time. The suffix is derived from the firmware version, so future version changes update it automatically:
+
+| Character | M | I | C | _ | M | A | T | R | I | X |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Color | White | Yellow | Orange | White | Red | Purple | Blue | Green | Yellow | Cyan |
+
+The same color sequence repeats through the underscore, lowercase v, version digits and decimal points. Each character lasts **0.5 seconds**. The board pauses **dark for 3 seconds** after the final version digit, then repeats. Each character has a single color at **20% absolute brightness**, with existing gamma mapping, gravity orientation and IMU-health blanking. This demo does not change saved app settings or the host-command brightness ceiling.
+
+The native USB Serial/JTAG host check uses USB start-of-frame traffic, not whether a serial app has opened the port. A detected computer/data host immediately suppresses the demo **for the remainder of that power session**. A sleeping PC, an absent/stopped app or an expired three-second status lease must remain dark rather than switching to the demo. Power-cycle on a charger to start a fresh standalone session. A charging source that also behaves as a USB data host suppresses the demo; a charge-only cable on a PC behaves like power-only because no host data reaches the board.
+
+Valid serial commands also suppress standalone mode. Demo rendering never renews the host lease, sends synthetic status, or changes firmware installation/restore behavior.
+
+Validation includes native tests for exact ten-second activation, every 500 ms letter boundary, the full three-second pause, per-letter RGB output and rotation, host/sleep suppression, IMU blanking and clock rollover. The physical board stayed dark past ten seconds on a computer without app updates, and its power-bank/charger sequence was checked visually before reconnecting to the Mac.
+
 ## Orientation and connection
 
 Gravity is filtered at 25 Hz; quadrant changes must remain stable for 200 ms. Hysteresis avoids diagonal flicker. Flat poses, free fall and large accelerations retain the last orientation. Stale or unavailable IMU data blanks the board and reports an error.
 
 Mapping: positive/negative X selects turns 3/1; positive/negative Y selects 0/2. A fixed 180-degree mounting correction is applied before the user offset. Mirror calibration also adjusts rotation handedness.
 
-The Orientation icon has an upward arrow and lower-left dot. Use it to check all four upright positions. The always-visible **Orientation** row has a 0/90/180/270-degree segmented offset picker and a **Mirror** switch. Mirroring flips artwork horizontally before orientation mapping.
+The always-visible **Orientation** row has a 0/90/180/270-degree segmented offset picker and a **Mirror** switch. Changing either shows the upward arrow and lower-left dot for 2.5 seconds on the matrix only, then restores the current status. Rapid adjustments restart the preview duration. Paused, disabled, locked/blanked or firmware-managed output does not light up for calibration. Mirroring flips artwork horizontally before orientation mapping.
+
+Firmware v4.0.3 replaces the arrow's selectable gallery slot with a **pixel mushroom** with a rounded red cap, cream spots and a solid cream stem two pixels high. Previously saved orientation-artwork or experimental Triforce selections become the mushroom; the arrow remains available only for temporary calibration and explicit `orientation` CLI diagnostics. Update the board through the bundled installer to get the new preset artwork.
 
 Serial I/O is nonblocking on a private queue. Exclusive access, partial writes, frame coalescing, acknowledgements and reconnect protect the UI and transport. Solid frames are refreshed at least once a second. Firmware starts dark, accepts explicit Off, and clears after three seconds without valid display updates.
 
@@ -232,7 +257,8 @@ CLI `off` remains supported for dark frames. In Full color mode, white means ful
 
 | Command | Reply |
 |---|---|
-| `HELLO` | `MATRIX 4 8 8 25 PRESET1`, only with healthy IMU |
+| `HELLO` | `MATRIX 4 8 8 25 PRESET1`, only with healthy IMU; version-reporting builds also send the INFO response |
+| `INFO` | `FIRMWARE MicMatrix 4.0.3 4 buildID builtAt` (installed version, protocol, 64-hex source hash and UTC timestamp) |
 | `PRESET seq icon style RRGGBB brightness flags relative effect rate effectPhase iconPhase` | `OK seq` |
 | `KEEP seq` | `OK seq`, only while the display lease is active |
 | `FRAME seq brightness flags rgb` | `OK seq` |
@@ -242,6 +268,7 @@ CLI `off` remains supported for dark frames. In Full color mode, white means ful
 | `ORIENTATION` | `ORIENT quadrant x-mg y-mg z-mg upright` |
 
 - Sequence: unsigned 32-bit integer.
+- Version metadata replies before v4.0.3 may have only `FIRMWARE MicMatrix version protocol`; the app accepts that shape without inventing missing dates/build IDs.
 - FRAME: exactly 64 `RRGGBB` values, top-left row-major, 384 hex characters.
 - DRAW: 16 hex digits; most significant byte is the top row and most significant bit is leftmost.
 - RGB/brightness inputs: 0-255. Nonzero brightness is clamped to 3-25; zero stays zero.
@@ -252,7 +279,7 @@ CLI `off` remains supported for dark frames. In Full color mode, white means ful
 - Relative intensity: 0-10000 (0-100%, 0.01% resolution). Effect: 0 solid, 1 pulse, 2 flash. Rate: 100-10000 millihertz (0.1-10 Hz).
 - Phase offsets: unsigned 32-bit milliseconds, separately for the effect and icon animation. KEEP does not restart either phase. Presets explicitly carry current phases when state/settings change or a connection is restored.
 
-Parsing is atomic. Malformed input returns `ERR ...` without replacing the display or renewing its watchdog. Timeout blanks LEDs and emits `TIMEOUT`. HELLO, STATUS, ORIENTATION, orientation redraws and local animation do not renew the three-second timeout. KEEP renews only an unexpired lease; it cannot relight an expired/OFF display. A new valid PRESET/FRAME/DRAW is required. Boot, OFF and IMU failure clear the display and stop its animation.
+Parsing is atomic. Malformed input returns `ERR ...` without replacing the display or renewing its watchdog. Timeout blanks LEDs and emits `TIMEOUT`. HELLO, INFO, STATUS, ORIENTATION, orientation redraws and local animation do not renew the three-second timeout. INFO is readable even if the IMU is unavailable, but metadata alone never indicates a healthy/ready device. KEEP renews only an unexpired lease; it cannot relight an expired/OFF display. A new valid PRESET/FRAME/DRAW is required. Boot, OFF and IMU failure clear the display and stop its animation.
 
 PRESET applies the same palette/tint/solid selection, gamma-2.2 and relative gain on the board, then the existing master brightness cap. FRAME remains raw RGB: the app applies gamma/relative gain before transmission, and firmware does not apply gamma twice.
 

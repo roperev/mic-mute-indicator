@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 private final class FirmwarePresentation: ObservableObject {
     enum NextAction { case install, confirmWithoutBackup }
     @Published var installing = false
+    @Published var expanded = false
     @Published var inspectConfirmation = false
     @Published var restoreConfirmation = false
     @Published var eraseConfirmation = false
@@ -15,11 +16,18 @@ private final class FirmwarePresentation: ObservableObject {
     var confirmationMAC = ""
     var nextAction: NextAction?
     var importURL: URL?
+
+    init(expanded: Bool = false) { self.expanded = expanded }
 }
 
 struct FirmwareManagementView: View {
     @ObservedObject var manager: FirmwareManager
-    @StateObject private var ui = FirmwarePresentation()
+    @StateObject private var ui: FirmwarePresentation
+
+    init(manager: FirmwareManager, initiallyExpanded: Bool = false) {
+        self.manager = manager
+        _ui = StateObject(wrappedValue: FirmwarePresentation(expanded: initiallyExpanded))
+    }
 
     private var color: Color {
         switch manager.selectedState.appearance {
@@ -31,6 +39,7 @@ struct FirmwareManagementView: View {
     }
 
     private var symbol: String {
+        if manager.devices.isEmpty && !manager.busy { return "cable.connector" }
         switch manager.selectedState.appearance {
         case .neutral: return "cable.connector"
         case .ready: return "checkmark.circle.fill"
@@ -39,91 +48,33 @@ struct FirmwareManagementView: View {
         }
     }
 
+    private var compactStatus: String {
+        if manager.busy { return manager.protectedOperation ? "Flashing — keep connected" : "Checking…" }
+        if manager.error != nil || manager.recoveryMessage != nil { return "Needs attention" }
+        if manager.devices.isEmpty { return "Not connected" }
+        switch manager.selectedState.appearance {
+        case .ready:
+            return manager.selectedState.info.map { "v\($0.version) · Ready" } ?? "Ready · version unknown"
+        case .information: return "Inspect firmware"
+        case .warning: return "Needs attention"
+        case .neutral: return "Not connected"
+        }
+    }
+
     var body: some View {
-        Section("Matrix firmware") {
-            if manager.devices.isEmpty && !manager.busy {
-                Label("Connect a Waveshare ESP32-S3-Matrix with a USB data cable.", systemImage: "cable.connector")
-                    .foregroundStyle(.secondary)
-            } else {
-                Picker("Device", selection: $manager.selectedPath) {
-                    ForEach(manager.devices) { device in
-                        Text(device.displayName).tag(device.path)
-                    }
-                    if !manager.devices.contains(where: { $0.path == manager.selectedPath }) {
-                        Text("Device reconnecting…").tag(manager.selectedPath)
-                    }
-                }
-                .disabled(manager.busy)
-                Label(manager.selectedState.message, systemImage: symbol)
-                    .foregroundStyle(color)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let mac = manager.selectedState.mac {
-                    LabeledContent("Recorded chip identity", value: mac)
-                        .textSelection(.enabled)
-                        .help("Recorded from inspection or a matching retained backup. The actual chip identity is checked again before every write.")
-                }
-                LabeledContent("Bundled MicMatrix build", value: manager.bundledBuild)
+        Section {
+            DisclosureGroup(isExpanded: $ui.expanded) {
+                firmwareDetails
+            } label: {
                 HStack {
-                    Button("Inspect firmware…") { ui.inspectConfirmation = true }
-                        .help("Reset into the bootloader to verify the ESP32-S3 chip, MAC, flash size and firmware fingerprint. Does not write flash.")
-                    Button("Install MicMatrix…") {
-                        ui.backup = true
-                        ui.useMatrix = true
-                        ui.confirmedBoard = false
-                        ui.nextAction = nil
-                        ui.confirmationMAC = manager.selectedState.mac ?? ""
-                        ui.installing = true
-                    }
-                    .disabled(manager.selectedState.mac == nil)
+                    Text("Matrix firmware")
                     Spacer()
-                    Button("Refresh") { manager.checkConnection() }
+                    Label(compactStatus, systemImage: symbol)
+                        .foregroundStyle(manager.error != nil || manager.recoveryMessage != nil ? .orange : color)
+                        .font(.callout)
+                        .lineLimit(1)
+                        .help(manager.selectedState.message)
                 }
-                .disabled(manager.busy)
-                if let (backup, _) = manager.original {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Original firmware backup").font(.subheadline.bold())
-                        Text(backup.firmware).foregroundStyle(.secondary)
-                        Text(backup.imagePath)
-                            .font(.caption.monospaced())
-                            .textSelection(.enabled)
-                            .fixedSize(horizontal: false, vertical: true)
-                        HStack {
-                            Label("Checksum verified", systemImage: "checkmark.shield")
-                                .foregroundStyle(.green).font(.caption)
-                            Spacer()
-                            Button("Reveal in Finder") {
-                                NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: backup.imagePath)])
-                            }
-                            Button("Flash back to original firmware…") {
-                                ui.confirmationMAC = manager.selectedState.mac ?? ""
-                                ui.restoreConfirmation = true
-                            }
-                                .disabled(manager.busy)
-                                .help("Overwrite this board's firmware with its registered original backup")
-                        }
-                    }
-                } else {
-                    Text("No verified original backup is registered for this board. Installation backs it up by default. Flashing back is unavailable without an original backup.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Button("Choose an existing backup file…", action: chooseBackup)
-                    .disabled(manager.busy || manager.selectedState.mac == nil)
-                    .help("Register a backup file from this exact board. This does not flash or change the board.")
-                Text(manager.original == nil
-                    ? "Set a file from this board as its original backup. Choosing a file does not flash the board."
-                    : "Add a backup file from this board. Your registered original stays unchanged; choosing a file does not flash the board.")
-                    .font(.caption).foregroundStyle(.secondary)
-                if manager.busy {
-                    Button("Show firmware progress") { manager.showingProgress = true }
-                }
-            }
-            if let error = manager.error {
-                Label(error, systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(.orange).font(.callout)
-                    .textSelection(.enabled)
-            }
-            if let recovery = manager.recoveryMessage {
-                Text(recovery).font(.caption).foregroundStyle(.orange).textSelection(.enabled)
             }
         }
         .sheet(isPresented: $ui.installing, onDismiss: completeInstallConfirmation) { installSheet }
@@ -160,6 +111,146 @@ struct FirmwareManagementView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Confirm that \(ui.importURL?.lastPathComponent ?? "this image") is a complete backup from this exact board (\(manager.selectedState.mac ?? "unknown")). This registers the file only; it does not flash or change the board. File checks cannot prove which board created it. If no original is registered, this becomes the original backup. Otherwise it is added separately without replacing the original.")
+        }
+    }
+
+    private var firmwareDetails: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            if manager.devices.isEmpty && !manager.busy {
+                Label("Connect a Waveshare ESP32-S3-Matrix with a USB data cable.", systemImage: "cable.connector")
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Device").font(.subheadline.bold())
+                    Picker("Connected board", selection: $manager.selectedPath) {
+                        ForEach(manager.devices) { device in
+                            Text(device.displayName).tag(device.path)
+                        }
+                        if !manager.devices.contains(where: { $0.path == manager.selectedPath }) {
+                            Text("Device reconnecting…").tag(manager.selectedPath)
+                        }
+                    }
+                    .disabled(manager.busy)
+                    if let mac = manager.selectedState.mac {
+                        firmwareDetail("Chip identity", value: mac)
+                            .help("Recorded from inspection or a matching retained backup. The actual chip identity is checked again before every write.")
+                    }
+                    HStack(spacing: 10) {
+                        Button("Refresh") { manager.checkConnection() }
+                        Button("Inspect firmware…") { ui.inspectConfirmation = true }
+                            .help("Reset into the bootloader to verify the chip and firmware. Does not write flash.")
+                    }
+                    .disabled(manager.busy)
+                }
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Installed firmware").font(.subheadline.bold())
+                    Label(manager.selectedState.message, systemImage: symbol)
+                        .foregroundStyle(color)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let info = manager.selectedState.info {
+                        firmwareDetail("Built (UTC)", value: info.builtAt ?? "Not reported")
+                        firmwareDetail("Build ID", value: info.buildID ?? "Not reported")
+                    }
+                }
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Available to install").font(.subheadline.bold())
+                    firmwareDetail("Bundled firmware", value: manager.bundledBuild)
+                    firmwareDetail("Built (UTC)", value: manager.bundledBuiltAt)
+                    Button("Install MicMatrix…") {
+                        ui.backup = true
+                        ui.useMatrix = true
+                        ui.confirmedBoard = false
+                        ui.nextAction = nil
+                        ui.confirmationMAC = manager.selectedState.mac ?? ""
+                        ui.installing = true
+                    }
+                    .disabled(manager.busy || manager.selectedState.mac == nil)
+                }
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Backup & restore").font(.subheadline.bold())
+                    if let (backup, _) = manager.original {
+                        HStack {
+                            Text("Original backup").font(.callout)
+                            Spacer()
+                            Label("Checksum verified", systemImage: "checkmark.shield")
+                                .foregroundStyle(.green).font(.caption)
+                        }
+                        Text(backup.firmware).font(.callout).foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Saved file").font(.caption).foregroundStyle(.secondary)
+                            Text(backup.imagePath)
+                                .font(.caption.monospaced())
+                                .textSelection(.enabled)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        HStack(spacing: 10) {
+                            Button("Reveal in Finder") {
+                                NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: backup.imagePath)])
+                            }
+                            Button("Flash back to original firmware…") {
+                                ui.confirmationMAC = manager.selectedState.mac ?? ""
+                                ui.restoreConfirmation = true
+                            }
+                                .disabled(manager.busy)
+                                .help("Overwrite this board's firmware with its registered original backup")
+                        }
+                    } else {
+                        Text("No original backup is registered for this board. Installation backs it up by default. Flashing back requires an original backup.")
+                            .font(.callout).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Button("Choose an existing backup file…", action: chooseBackup)
+                            .disabled(manager.busy || manager.selectedState.mac == nil)
+                            .help("Register a backup file from this exact board. This does not flash or change the board.")
+                        Text(manager.original == nil
+                            ? "Register a file from this board as its original backup. This does not flash the board."
+                            : "Add a file from this board without replacing its original backup or flashing the board.")
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.top, 4)
+                }
+
+                if manager.busy {
+                    Divider()
+                    Button("Show firmware progress") { manager.showingProgress = true }
+                }
+            }
+            if let error = manager.error {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.orange).font(.callout)
+                    .textSelection(.enabled)
+            }
+            if let recovery = manager.recoveryMessage {
+                Text(recovery).font(.caption).foregroundStyle(.orange).textSelection(.enabled)
+            }
+        }
+        .padding(.top, 16)
+        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func firmwareDetail(_ title: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 16) {
+            Text(title)
+                .foregroundStyle(.secondary)
+                .frame(width: 130, alignment: .leading)
+            Text(value)
+                .font(.callout.monospaced())
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 

@@ -7,7 +7,7 @@ APP="build/Settings Screenshots.app"
 mkdir -p "$APP/Contents/MacOS" Resources/screenshots
 cp build/settings-window-tests "$APP/Contents/MacOS/TeamsMuteLight"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
-"$APP/Contents/MacOS/TeamsMuteLight" --screenshots --capture --light
+"$APP/Contents/MacOS/TeamsMuteLight" --screenshots --capture
 for tab in 0 1 2 3; do
   case "$tab" in
     0) name=general ;;
@@ -15,6 +15,6 @@ for tab in 0 1 2 3; do
     2) name=effects ;;
     3) name=advanced ;;
   esac
-  cp "build/settings-light-tab-$tab.png" "Resources/screenshots/$name.png"
+  cp "build/settings-dark-tab-$tab.png" "Resources/screenshots/$name.png"
 done
-cp build/settings-light-color-popover.png Resources/screenshots/color-picker.png
+cp build/settings-dark-color-popover.png Resources/screenshots/color-picker.png

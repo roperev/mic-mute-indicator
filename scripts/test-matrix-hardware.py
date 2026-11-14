@@ -19,6 +19,9 @@ def main():
     parser.add_argument("--orientation-test", action="store_true", help="Show an up arrow for 20 s while you rotate the board")
     parser.add_argument("--offset", type=int, choices=range(4), default=0)
     parser.add_argument("--mirror", action="store_true")
+    parser.add_argument("--firmware-version", help="Require this installed firmware version via INFO")
+    parser.add_argument("--standalone-host-safety", action="store_true",
+                        help="Wait past the standalone delay and verify a USB host without frame updates stays dark")
     args = parser.parse_args()
     fd = os.open(args.port, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
     received = bytearray()
@@ -65,6 +68,20 @@ def main():
         send("STATUS")
         expect("STATE ", expected)
 
+    def firmware_info():
+        send("INFO")
+        reply = expect("FIRMWARE ").split()
+        if reply[:4] != ["FIRMWARE", "MicMatrix", args.firmware_version, "4"]:
+            raise AssertionError(f"Incorrect installed firmware version: {reply}")
+        if len(reply) == 6:
+            from datetime import datetime
+            if len(reply[4]) != 64 or any(c not in "0123456789abcdef" for c in reply[4]):
+                raise AssertionError("Invalid firmware build ID")
+            datetime.strptime(reply[5], "%Y-%m-%dT%H:%M:%SZ")
+        elif len(reply) != 4:
+            raise AssertionError("Incorrect firmware metadata shape")
+        return reply
+
     try:
         fcntl.ioctl(fd, termios.TIOCEXCL)
         tty.setraw(fd, termios.TCSANOW)
@@ -80,8 +97,17 @@ def main():
         if handshake not in ("MATRIX 3 8 8 25", "MATRIX 4 8 8 25 PRESET1"):
             raise AssertionError(f"Unsupported firmware: {handshake}")
         identified = True
+        if args.firmware_version:
+            firmware_info()
+            print(f"Verified board-reported MicMatrix firmware v{args.firmware_version}, protocol 4.")
         state("STATE 0 0 0 0")
         print("Verified firmware handshake and dark startup.")
+        if args.standalone_host_safety:
+            send("OFF 199")
+            expect("OK ", "OK 199")
+            time.sleep(11)
+            state("STATE 0 0 0 0")
+            print("Verified power-only demo does not start on a USB host without app updates after 10 seconds.")
         if handshake.endswith("PRESET1"):
             send("KEEP 200")
             expect("ERR ", "ERR inactive")
@@ -207,6 +233,8 @@ def main():
         while time.monotonic() - started < 3.4:
             send("HELLO")
             expect("MATRIX ", handshake)
+            if args.firmware_version:
+                firmware_info()
             send("DRAW 4 256 0 0 51 0 0000183C3C180000")
             expect("ERR ", "ERR command")
             if not checked_before_timeout and time.monotonic() - started >= 2.4:

@@ -53,6 +53,7 @@ final class MatrixLight: LightOutput {
     private(set) var connectedDevice: MatrixDeviceInfo?
     private(set) var acknowledgedFrames = 0
     private(set) var supportsPresets = false
+    private(set) var reportedFirmware: MatrixFirmwareInfo?
 
     private enum Payload: Equatable {
         case frame(MatrixFrame)
@@ -92,6 +93,7 @@ final class MatrixLight: LightOutput {
     private var pending: Pending?
     private var lastAcknowledged: Payload?
     private var presetFirmware = false
+    private var firmwareInfo: MatrixFirmwareInfo?
     private var sequence: UInt32 = 0
     private var openedAt: TimeInterval = 0
     private var lastHello: TimeInterval = 0
@@ -193,6 +195,18 @@ final class MatrixLight: LightOutput {
             iconStart: iconAnimationStart)))
     }
 
+    func applyOrientationTest(brightness: Double) {
+        guard brightness.isFinite else {
+            release()
+            statusText = "Error: invalid matrix calibration brightness"
+            Log.info(statusText)
+            return
+        }
+        enqueue(.frame(MatrixFrame(color: RGB(r: 255, g: 255, b: 255),
+            brightness: brightness, rotation: rotation, icon: .orientation,
+            mirrored: mirrored, style: .artwork)))
+    }
+
     func applyRainbow(t: TimeInterval, duration: TimeInterval, sweeps: Int, brightness: Double) {
         guard brightness.isFinite else {
             release()
@@ -241,11 +255,13 @@ final class MatrixLight: LightOutput {
         publishedStatus = status
         publishedDevice = device
         let supports = presetFirmware
+        let info = firmwareInfo
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.statusText = status
             self.connectedDevice = device
             self.supportsPresets = supports
+            self.reportedFirmware = info
             self.onChange?()
         }
     }
@@ -280,6 +296,7 @@ final class MatrixLight: LightOutput {
         openedDevice = nil
         identified = false
         presetFirmware = false
+        firmwareInfo = nil
         input.removeAll()
         outgoing.removeAll()
         pending = nil
@@ -422,6 +439,13 @@ final class MatrixLight: LightOutput {
                     .trimmingCharacters(in: .whitespacesAndNewlines),
                       let reply = MatrixReply(line: line) else { continue } // Ignore boot diagnostics.
                 switch reply {
+                case .firmware(let info):
+                    guard identified, info.protocolVersion == (presetFirmware ? 4 : 3) else { continue }
+                    firmwareInfo = info
+                    DispatchQueue.main.async { [weak self] in
+                        self?.reportedFirmware = info
+                        self?.onChange?()
+                    }
                 case .hello, .presets:
                     guard !identified else { continue }
                     identified = true

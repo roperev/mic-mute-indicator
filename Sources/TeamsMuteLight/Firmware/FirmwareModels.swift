@@ -14,6 +14,8 @@ struct FirmwareManifest: Codable {
     let flashSize: Int
     let `protocol`: Int
     let buildID: String
+    let builtAt: String
+    let firmwareVersion: String
     let image: String
     let sha256: String
 
@@ -26,6 +28,9 @@ struct FirmwareManifest: Codable {
             from: Data(contentsOf: directory.appendingPathComponent("manifest.json")))
         guard manifest.formatVersion == 1, manifest.chip == "esp32s3",
               manifest.flashSize == 4_194_304, manifest.protocol == 4,
+              MatrixReply(line: "FIRMWARE MicMatrix \(manifest.firmwareVersion) 4 \(manifest.buildID) \(manifest.builtAt)") ==
+                .firmware(MatrixFirmwareInfo(version: manifest.firmwareVersion, protocolVersion: 4,
+                    buildID: manifest.buildID, builtAt: manifest.builtAt)),
               manifest.image == "micmatrix.bin" else {
             throw FirmwareFailure.invalid("The bundled firmware manifest is incompatible.")
         }

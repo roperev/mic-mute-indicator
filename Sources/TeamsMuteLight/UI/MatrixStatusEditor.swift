@@ -66,7 +66,7 @@ private struct MatrixStatusCard: View {
             Button { ui.choosingIcon = true } label: {
                 VStack(spacing: 5) {
                     MatrixIconPreview(icon: icon, color: color, style: style)
-                    Text(icon == .orientation ? "Up arrow" : icon.label)
+                    Text(icon.label)
                         .font(.caption).lineLimit(1)
                 }
             }
@@ -129,7 +129,7 @@ private struct MatrixIconChooser: View {
                     } label: {
                         VStack(spacing: 5) {
                             MatrixIconPreview(icon: icon, scale: 0.5)
-                            Text(icon == .orientation ? "Up arrow" : icon.label)
+                            Text(icon.label)
                                 .font(.caption).lineLimit(2)
                                 .multilineTextAlignment(.center)
                                 .frame(height: 28)

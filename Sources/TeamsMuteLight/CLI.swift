@@ -236,9 +236,10 @@ enum CLI {
           ax-dump                                   Print Teams buttons seen via Accessibility
           watch                                     Live-print mute state from both detectors
         Note: ax-dump/watch need Accessibility permission for your terminal app.
-        Matrix icons: microphone, mutedMicrophone, fire, prohibited, check, dot, orientation,
+        Matrix icons: microphone, mutedMicrophone, fire, prohibited, check, dot, mushroom,
                       heart, shield, rainbow, headphones, moon, afk, smiley, shrug, warning.
         The legacy "off" identifier is still accepted for a dark CLI frame.
+        The "orientation" identifier remains available for CLI calibration, not the artwork chooser.
         The legacy identifier "shield" now displays Adobe A.
         Disable the matrix in the app before using its CLI or flashing firmware.
         """)

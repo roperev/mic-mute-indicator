@@ -11,6 +11,7 @@ struct FirmwareDeviceState {
     var mac: String?
     var message = "Possibly stock — firmware not recognized"
     var appearance = FirmwareAppearance.information
+    var info: MatrixFirmwareInfo? = nil
 }
 
 final class FirmwareManager: ObservableObject, FirmwareTerminationState {
@@ -26,6 +27,7 @@ final class FirmwareManager: ObservableObject, FirmwareTerminationState {
     @Published private(set) var progress: Double?
     @Published private(set) var backups: [(FirmwareBackup, URL)] = []
     @Published private(set) var bundledBuild = "Not available"
+    @Published private(set) var bundledBuiltAt = "Not available"
     @Published private(set) var recoveryMessage: String?
     @Published var showingProgress = false
     var suspendOutput: ((@escaping () -> Void) -> Void)?
@@ -47,6 +49,7 @@ final class FirmwareManager: ObservableObject, FirmwareTerminationState {
     private var useAfterInstall = true
     private var activePath: String?
     private var operationMAC: String?
+    private var expectedFirmware: MatrixFirmwareInfo?
     private var checkWork: DispatchWorkItem?
 
     var selectedDevice: MatrixDeviceInfo? { devices.first { $0.path == selectedPath } }
@@ -56,7 +59,8 @@ final class FirmwareManager: ObservableObject, FirmwareTerminationState {
     func start() {
         do {
             let (manifest, _, _) = try FirmwareManifest.load()
-            bundledBuild = String(manifest.buildID.prefix(12))
+            bundledBuild = "v\(manifest.firmwareVersion) · build \(manifest.buildID.prefix(12))"
+            bundledBuiltAt = manifest.builtAt
         } catch { self.error = "Firmware resources unavailable: \(error.localizedDescription)" }
         observer.onChange = { [weak self] in self?.scheduleRefresh() }
         do { try observer.start() }
@@ -118,13 +122,12 @@ final class FirmwareManager: ObservableObject, FirmwareTerminationState {
             return
         }
         activePath = device.path
-        let knownBuild = states[device.path]?.message
         states[device.path] = FirmwareDeviceState(mac: states[device.path]?.mac,
             message: matrix.statusText.hasPrefix("OK")
-                ? (knownBuild?.contains("bundled build") == true ? knownBuild! :
-                    "MicMatrix ready · protocol \(matrix.supportsPresets ? 4 : 3) · build not reported")
+                ? MatrixFirmwareInfo.readyDescription(info: matrix.reportedFirmware,
+                    protocolVersion: matrix.supportsPresets ? 4 : 3)
                 : "MicMatrix recognized · checking display",
-            appearance: .ready)
+            appearance: .ready, info: matrix.reportedFirmware)
     }
 
     func suppressesOutput(serial: String) -> Bool {
@@ -222,6 +225,10 @@ final class FirmwareManager: ObservableObject, FirmwareTerminationState {
         print(manager.message)
         print("Identity: \(manager.selectedState.mac ?? "not reported")")
         print("Firmware: \(manager.selectedState.message)")
+        if let info = manager.selectedState.info {
+            print("Firmware build ID: \(info.buildID ?? "not reported")")
+            print("Firmware built at (UTC): \(info.builtAt ?? "not reported")")
+        }
         for (backup, _) in manager.backups {
             print("Verified \(backup.role) backup: \(backup.imagePath)")
         }
@@ -261,9 +268,11 @@ final class FirmwareManager: ObservableObject, FirmwareTerminationState {
         let matrix = probe
         probe = nil
         states[device.path] = FirmwareDeviceState(mac: states[device.path]?.mac,
-            message: warning ?? (recognized ? "MicMatrix ready · protocol \(presets ? 4 : 3) · build not reported"
+            message: warning ?? (recognized ? MatrixFirmwareInfo.readyDescription(info: matrix?.reportedFirmware,
+                protocolVersion: presets ? 4 : 3)
                 : "Possibly stock — firmware not recognized. Inspect to identify the chip and firmware."),
-            appearance: warning != nil ? .warning : recognized ? .ready : .information)
+            appearance: warning != nil ? .warning : recognized ? .ready : .information,
+            info: recognized ? matrix?.reportedFirmware : nil)
         let finish = { [weak self] in
             guard let self else { return }
             self.busy = false
@@ -305,7 +314,10 @@ final class FirmwareManager: ObservableObject, FirmwareTerminationState {
         guard !busy, let device = selectedDevice else { return }
         do {
             let (manifest, image, helper) = try FirmwareManifest.load()
-            bundledBuild = String(manifest.buildID.prefix(12))
+            bundledBuild = "v\(manifest.firmwareVersion) · build \(manifest.buildID.prefix(12))"
+            bundledBuiltAt = manifest.builtAt
+            expectedFirmware = MatrixFirmwareInfo(version: manifest.firmwareVersion, protocolVersion: manifest.protocol,
+                buildID: manifest.buildID, builtAt: manifest.builtAt)
             let mac = selectedState.mac
             guard operation == "inspect" || mac != nil else {
                 throw FirmwareFailure.invalid("Inspect this device first to verify its chip identity.")
@@ -474,16 +486,18 @@ final class FirmwareManager: ObservableObject, FirmwareTerminationState {
             matrix.onChange = { [weak self, weak matrix] in
                 guard let self, let matrix, self.probe === matrix,
                       matrix.statusText.hasPrefix("OK"),
-                      self.operation != "install" || matrix.supportsPresets else { return }
+                      self.operation != "install" ||
+                        (matrix.supportsPresets && matrix.reportedFirmware == self.expectedFirmware) else { return }
                 self.checkWork?.cancel()
                 self.probe = nil
                 let protocolVersion = matrix.supportsPresets ? 4 : 3
+                let reportedFirmware = matrix.reportedFirmware
                 matrix.releaseForFirmware {
                     let installed = self.operation == "install"
                     self.states[candidate.path] = FirmwareDeviceState(mac: mac,
-                        message: installed ? "MicMatrix ready · protocol 4 · bundled build \(self.bundledBuild)"
-                            : "MicMatrix ready · protocol \(protocolVersion) · build not reported",
-                        appearance: .ready)
+                        message: MatrixFirmwareInfo.readyDescription(info: reportedFirmware,
+                            protocolVersion: protocolVersion),
+                        appearance: .ready, info: reportedFirmware)
                     self.selectedPath = candidate.path
                     self.message = installed ? "MicMatrix installed, flash verified and accelerometer ready."
                         : "MicMatrix identity and accelerometer checked; no flash contents changed."

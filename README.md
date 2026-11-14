@@ -8,11 +8,13 @@ A macOS menu-bar app that shows **Microsoft Teams mute state**, not just microph
 
 [Release notes](CHANGELOG.md) · [Matrix setup and protocol](MATRIX.md)
 
+[Download v4.0.0 for Apple Silicon](https://github.com/roperev/mic-mute-indicator/releases/download/v4.0.0/TeamsMuteLight-v4.0.0-macOS-arm64.zip) · [SHA-256 checksum](https://github.com/roperev/mic-mute-indicator/releases/download/v4.0.0/TeamsMuteLight-v4.0.0-macOS-arm64.zip.sha256)
+
 **New in v4.0.0:** redesigned Settings and an app-contained firmware installer/restore workflow for Waveshare ESP32-S3-Matrix. Existing light settings are preserved.
 
 ## Screenshots
 
-Current v4.0.0 Settings, rendered from the app's SwiftUI views with isolated sample settings. Device/status details depend on your connected hardware.
+Current v4.0.0 Settings in dark appearance, rendered from the app's SwiftUI views with isolated sample settings. Device/status details depend on your connected hardware.
 
 | General | Lights |
 |---|---|
@@ -33,7 +35,7 @@ Regenerate these images on macOS with `bash scripts/generate-settings-screenshot
 
 ## Install the app and set up a new matrix
 
-The downloadable app targets **Apple Silicon Macs running macOS 14+**. Use an app ZIP from this project's GitHub Releases when published, not GitHub's source-code ZIP. Extract **Teams Mute Light.app**, copy it to Applications, and open it. No Python, Arduino CLI, Homebrew or runtime downloads are needed by the packaged app.
+The downloadable app targets **Apple Silicon Macs running macOS 14+** and bundles **MicMatrix firmware v4.0.3**. Use the app ZIP from the [v4.0.0 release](https://github.com/roperev/mic-mute-indicator/releases/tag/v4.0.0), not GitHub's source-code ZIP. Extract **Teams Mute Light.app**, copy it to Applications, and open it. No Python, Arduino CLI, Homebrew or runtime downloads are needed by the packaged app.
 
 **macOS approval:** this project is locally/self-signed, not Apple-notarized. Gatekeeper can warn or block a downloaded copy. Verify the download source/checksum before allowing it through **System Settings > Privacy & Security > Open Anyway**, when macOS offers that option. Managed Macs may prohibit unnotarized apps. Do not disable Gatekeeper globally. Accessibility permission is still granted separately for reading Teams.
 
@@ -43,6 +45,8 @@ The downloadable app targets **Apple Silicon Macs running macOS 14+**. Use an ap
 4. Choose **Install MicMatrix**, confirm the board model and leave **Back up current firmware** checked. Generic Espressif USB IDs do not identify the Waveshare board model.
 5. Leave **Use this matrix for status lights** checked to select and enable this board after flash verification and a healthy MicMatrix/accelerometer handshake.
 6. Keep the app open and USB connected until completion. Settings lists the verified original backup's path and **Reveal in Finder**.
+
+The collapsed **Matrix firmware** row shows a compact Ready/failed/not-connected status. Expand it for inspection, installation, backup and restore controls. The installed version comes from the board, while the separate bundled-build label describes the image available to install. Firmware v4.0.3 also reports its source build ID and UTC build timestamp; these appear in the expanded details. Older builds show missing metadata as **Not reported** rather than guessing from the app bundle.
 
 Backups default to `~/Library/Application Support/TeamsMuteLight/FirmwareBackups/<device-MAC>/`. The first original is preserved; later backups are separate snapshots. If you deliberately uncheck backup, a **second destructive confirmation** is required: existing flash contents will be destroyed, and there is no return to the original without an existing valid backup.
 
@@ -125,12 +129,15 @@ The three editable statuses use full palette intensity; relative sliders supply 
 
 > **Brightness and heat:** The 9% default is intended for a light-diffusing case. Start lower, such as 2%, on exposed LEDs. Firmware caps channel output at `25/255` (9.8%); this is a precaution, **not a thermal guarantee**. Avoid sustained full-panel white and unplug unusually hot hardware.
 
+Firmware **v4.0.3** displays `MIC_MATRIX_v4.0.3` on power-only USB, automatically using the actual firmware version. After 10 seconds on a charger/power bank, characters cycle every 0.5 seconds, followed by a 3-second dark pause. It uses **20% absolute brightness**, separately from the app's 10% cap. Once a computer USB host is detected, the demo stays suppressed until power-cycle—even if the app quits or the computer sleeps. See [standalone behavior and safety](MATRIX.md#power-only-demo-firmware-v403).
+
 - **Choose artwork:** click the hero preview. Full color (formerly Original palette), Tint artwork, and Single color are available. Enabled, black/Off and 0% brightness can hide a status without changing its icon. Test previews that state on all enabled outputs for three seconds.
 - **Master brightness:** hover over the information icon beside Master Matrix Brightness for relative-level behavior, low-level LED precision and safety guidance.
 - **Preview appearance:** hero thumbnails show normalized color intensity, not physical brightness. Gamma-2.2 correction is applied only to LED output.
 - **Call-start effect:** a full-panel rainbow flow temporarily replaces the icon, then restores the status. It uses master brightness, not the relative status multiplier.
 - **Overnight behavior:** with no Live/Muted call, lock, inactive user session, display sleep, or system sleep blanks the matrix. It restores when you return. Other outputs are unchanged.
 - **Orientation:** gravity keeps artwork upright. The always-visible segmented control adds a 0/90/180/270-degree offset; Mirror flips the artwork horizontally before orientation mapping.
+- **Calibration preview:** changing Orientation or Mirror briefly shows the arrow and lower-left dot for 2.5 seconds, then restores the current status. The arrow is no longer selectable artwork; its gallery slot is now a red-and-cream pixel mushroom. Disabled, paused or automatically blanked matrix output stays off.
 
 ![Matrix artwork gallery: 16 choices, each in full color, red and cyan](Resources/matrix-gallery.svg)
 

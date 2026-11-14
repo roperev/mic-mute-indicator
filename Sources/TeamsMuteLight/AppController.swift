@@ -56,7 +56,7 @@ final class AppController: ObservableObject {
     let axMonitor = AccessibilityMonitor()
     let kuando = KuandoLight()
     let blinkStick = BlinkStickLight()
-    let matrix = MatrixLight()
+    let matrix: MatrixLight
     let homeAssistant = HomeAssistantLight()
     let webhook = WebhookLight()
     let firmware = FirmwareManager()
@@ -178,7 +178,8 @@ final class AppController: ObservableObject {
         menuBarPulseTimer = timer
     }
 
-    init(measurementSettings: AppSettings? = nil) {
+    init(measurementSettings: AppSettings? = nil, matrix: MatrixLight = MatrixLight()) {
+        self.matrix = matrix
         isolatedMeasurement = measurementSettings != nil
         settings = measurementSettings ?? AppSettings.load()
         homeAssistantToken = measurementSettings == nil ? (Keychain.get(.homeAssistantToken) ?? "") : ""
@@ -420,9 +421,14 @@ final class AppController: ObservableObject {
     private var phaseStart = Date()
     private var rainbowStart = Date()
     private var rainbowUntil: Date?
+    private var orientationPreviewUntil: TimeInterval?
+    private var orientationPreviewWork: DispatchWorkItem?
 
     func pushLights() {
         let now = Date()
+        if let until = orientationPreviewUntil, ProcessInfo.processInfo.systemUptime >= until {
+            orientationPreviewUntil = nil
+        }
         if let until = rainbowUntil, now >= until { rainbowUntil = nil }
         if paused && previewState == nil && rainbowUntil == nil {
             stopAnimation()
@@ -434,6 +440,7 @@ final class AppController: ObservableObject {
             if active.output === matrix {
                 guard isolatedMeasurement || !firmware.suppressesOutput(serial: matrix.serial) else { return false }
                 guard !matrixAvailability.shouldBlank(state: micState) else { return false }
+                if orientationPreviewUntil != nil { return false }
                 return rainbowUntil != nil || (matrix.connectedDevice != nil && !matrix.supportsPresets &&
                     (settings.effects[state].effect != .solid || settings.matrix.icons[state].isAnimated))
             }
@@ -472,6 +479,10 @@ final class AppController: ObservableObject {
                 }
             }
             let brightness = LightBrightness.clamped(a.config.brightness)
+            if a.output === matrix, orientationPreviewUntil != nil {
+                matrix.applyOrientationTest(brightness: brightness)
+                continue
+            }
             if a.output === matrix, rainbowUntil != nil {
                 matrix.applyRainbow(t: now.timeIntervalSince(rainbowStart),
                     duration: settings.rainbowDuration, sweeps: rainbowSweeps, brightness: brightness)
@@ -536,6 +547,56 @@ final class AppController: ObservableObject {
             configureDetection()
         }
         recompute()
+        if old.matrix.rotation != settings.matrix.rotation || old.matrix.mirrored != settings.matrix.mirrored {
+            previewMatrixOrientation()
+        }
+    }
+
+    func previewMatrixOrientation() {
+        orientationPreviewWork?.cancel()
+        orientationPreviewUntil = nil
+        guard settings.matrix.light.enabled, !paused,
+              !matrixAvailability.shouldBlank(state: micState),
+              isolatedMeasurement || !firmware.suppressesOutput(serial: matrix.serial) else { return }
+        orientationPreviewUntil = ProcessInfo.processInfo.systemUptime + 2.5
+        let work = DispatchWorkItem { [weak self] in
+            self?.orientationPreviewUntil = nil
+            self?.pushLights()
+        }
+        orientationPreviewWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5, execute: work)
+        pushLights()
+    }
+
+    static func testOrientationPreviewLifecycle() {
+        var configuration = AppSettings()
+        configuration.kuando.enabled = false
+        configuration.blinkStick.enabled = false
+        configuration.homeAssistant.light.enabled = false
+        configuration.webhook.light.enabled = false
+        configuration.matrix.light.enabled = true
+        let controller = AppController(measurementSettings: configuration, matrix: MatrixLight(discover: { [] }))
+        defer { controller.shutdown() }
+        let original = controller.settings
+        controller.previewMatrixOrientation()
+        precondition(controller.orientationPreviewUntil != nil)
+        let firstDeadline = controller.orientationPreviewUntil!
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        controller.previewMatrixOrientation()
+        precondition(controller.orientationPreviewUntil! > firstDeadline)
+        let deadline = Date().addingTimeInterval(2.8)
+        while controller.orientationPreviewUntil != nil && Date() < deadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+        }
+        precondition(controller.orientationPreviewUntil == nil && controller.settings == original)
+        precondition(controller.previewState == nil && controller.micState == .unknown)
+        controller.paused = true
+        controller.previewMatrixOrientation()
+        precondition(controller.orientationPreviewUntil == nil)
+        controller.paused = false
+        controller.matrixAvailability.locked = true
+        controller.previewMatrixOrientation()
+        precondition(controller.orientationPreviewUntil == nil)
     }
 
     /// Show a state's colors for 3 seconds.
@@ -625,6 +686,9 @@ final class AppController: ObservableObject {
             Log.info("Shutdown blocked until firmware work reaches a safe state")
             return
         }
+        orientationPreviewWork?.cancel()
+        orientationPreviewWork = nil
+        orientationPreviewUntil = nil
         menuBarPulseTimer?.invalidate()
         menuBarPulseTimer = nil
         screenLockTokens.forEach { DistributedNotificationCenter.default().removeObserver($0) }

@@ -56,6 +56,30 @@ enum MatrixTests {
     }
 
     static func testReplyParsing() {
+        let firmware = MatrixFirmwareInfo(version: "4.0.0", protocolVersion: 4)
+        precondition(MatrixReply(line: "FIRMWARE MicMatrix 4.0.0 4") == .firmware(firmware))
+        let hash = String(repeating: "a", count: 64)
+        let metadata = MatrixFirmwareInfo(version: "4.0.3", protocolVersion: 4,
+            buildID: hash, builtAt: "2026-11-14T20:00:00Z")
+        precondition(MatrixReply(line: "FIRMWARE MicMatrix 4.0.3 4 \(hash) 2026-11-14T20:00:00Z") ==
+            .firmware(metadata))
+        for suffix in ["abc 2026-11-14T20:00:00Z", "\(hash) yesterday",
+                       "\(hash) 2026-99-14T20:00:00Z", "\(hash) 2026-11-14",
+                       "\(String(repeating: "z", count: 64)) 2026-11-14T20:00:00Z"] {
+            precondition(MatrixReply(line: "FIRMWARE MicMatrix 4.0.3 4 \(suffix)") == nil)
+        }
+        precondition(MatrixFirmwareInfo.readyDescription(info: firmware, protocolVersion: 4) ==
+            "MicMatrix Firmware v4.0.0 (protocol 4 support) installed · ready")
+        precondition(MatrixFirmwareInfo.readyDescription(info: nil, protocolVersion: 4)
+            .contains("version not reported"))
+        precondition(MatrixFirmwareInfo.readyDescription(info: firmware, protocolVersion: 3)
+            .contains("version not reported"))
+        for line in ["FIRMWARE Other 4.0.0 4", "FIRMWARE MicMatrix 4.0 4",
+                     "FIRMWARE MicMatrix 4..0 4", "FIRMWARE MicMatrix -1.0.0 4",
+                     "FIRMWARE MicMatrix 4.0.0 -4", "FIRMWARE MicMatrix 4.0.0 256",
+                     "FIRMWARE MicMatrix 4.0.0 4 extra", "FIRMWARE MicMatrix 4294967296.0.0 4"] {
+            precondition(MatrixReply(line: line) == nil)
+        }
         precondition(MatrixReply(line: "MATRIX 4 8 8 25 PRESET1") == .presets)
         precondition(MatrixReply(line: "MATRIX 3 8 8 25") == .hello)
         precondition(MatrixReply(line: "OK 4294967295") == .acknowledged(UInt32.max))
@@ -368,6 +392,31 @@ enum MatrixTests {
 
     static func testNewArtworkAndAnimations() throws {
         precondition(MatrixIcon.allCases.count == 16)
+        precondition(MatrixIcon.allCases.contains(.mushroom) && !MatrixIcon.allCases.contains(.orientation))
+        let mushroom = MatrixIcon.mushroom.artwork
+        precondition(MatrixIcon.mushroom.bitmap == mushroom.enumerated().reduce(UInt64(0)) {
+            $1.element.isOff ? $0 : $0 | (UInt64(1) << (63 - $1.offset))
+        })
+        precondition(mushroom[3] == RGB(r: 255, g: 35, b: 45))
+        precondition(mushroom[11] == RGB(r: 255, g: 245, b: 220))
+        precondition(mushroom[50] == RGB(r: 255, g: 245, b: 220))
+        for row in [5, 6] {
+            precondition(Array(mushroom[row * 8..<(row + 1) * 8]) ==
+                [.off, .off, RGB(r: 255, g: 245, b: 220), RGB(r: 255, g: 245, b: 220),
+                 RGB(r: 255, g: 245, b: 220), RGB(r: 255, g: 245, b: 220), .off, .off])
+        }
+        precondition(mushroom[56..<64].allSatisfy(\.isOff))
+        precondition((0..<5).map { row in mushroom[row * 8..<(row + 1) * 8].filter { !$0.isOff }.count } ==
+            [2, 4, 6, 8, 8])
+        precondition(MatrixIcon.orientation.artwork[56] == RGB(r: 255, g: 110, b: 0))
+        var formerArrow = MatrixConfig()
+        formerArrow.icons.muted = .orientation
+        let migratedArrow = try JSONDecoder().decode(MatrixConfig.self, from: JSONEncoder().encode(formerArrow))
+        precondition(migratedArrow.icons.muted == .mushroom)
+        precondition(migratedArrow.icons.unmuted == formerArrow.icons.unmuted)
+        formerArrow.icons.muted = .triforce
+        let migratedTriforce = try JSONDecoder().decode(MatrixConfig.self, from: JSONEncoder().encode(formerArrow))
+        precondition(migratedTriforce.icons.muted == .mushroom)
         precondition(!MatrixIcon.allCases.contains(.off) && MatrixIcon.allCases.contains(.warning))
         precondition(MatrixIcon.warning.artwork[3] == RGB(r: 255, g: 210, b: 20))
         precondition(MatrixIcon.warning.artwork[11] == RGB(r: 255, g: 35, b: 45))

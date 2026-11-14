@@ -29,8 +29,7 @@ enum MatrixGallery {
         for (row, icon) in icons.enumerated() {
             let top = 145 + (row / 4) * 340
             let baseLeft = 32 + (row % 4) * 248
-            let label = icon == .orientation ? "Orientation test"
-                : icon == .afk ? "AFK (A / F / K)" : icon == .shrug ? "Shrug (scrolls left)" : icon.label
+            let label = icon == .afk ? "AFK (A / F / K)" : icon == .shrug ? "Shrug (scrolls left)" : icon.label
             svg += "<text x=\"\(baseLeft)\" y=\"\(top - 15)\" font-size=\"15\">\(label)</text>"
             svg += "<text x=\"\(baseLeft)\" y=\"\(top + 307)\" font-size=\"11\" fill=\"#93a9bb\">Red / cyan alternatives</text>"
             for (column, variant) in variants.enumerated() {

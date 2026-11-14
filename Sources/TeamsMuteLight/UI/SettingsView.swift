@@ -7,11 +7,13 @@ private final class SettingsNavigation: ObservableObject {
 struct SettingsView: View {
     var selectedTab: Binding<Int>?
     var expandAdvancedDetails = false
+    var expandFirmwareDetails = false
     @StateObject private var navigation = SettingsNavigation()
 
     var body: some View {
         TabView(selection: selectedTab ?? $navigation.tab) {
-            GeneralTab().tabItem { Label("General", systemImage: "gearshape") }.tag(0)
+            GeneralTab(expandFirmwareDetails: expandFirmwareDetails)
+                .tabItem { Label("General", systemImage: "gearshape") }.tag(0)
             LightsTab().tabItem { Label("Lights", systemImage: "lightbulb.2") }.tag(1)
             EffectsTab().tabItem { Label("Effects", systemImage: "sparkles") }.tag(2)
             AdvancedTab(expandDetails: expandAdvancedDetails)
@@ -75,6 +77,7 @@ struct StateColorsEditor: View {
 
 struct GeneralTab: View {
     @EnvironmentObject var c: AppController
+    var expandFirmwareDetails = false
 
     var body: some View {
         Form {
@@ -125,7 +128,7 @@ struct GeneralTab: View {
                 Toggle("Launch at login", isOn: $c.launchAtLogin)
             }
 
-            FirmwareManagementView(manager: c.firmware)
+            FirmwareManagementView(manager: c.firmware, initiallyExpanded: expandFirmwareDetails)
 
             Section {
                 EmptyView()

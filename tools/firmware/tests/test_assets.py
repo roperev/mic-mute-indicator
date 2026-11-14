@@ -12,13 +12,23 @@ class FirmwareAssetsTests(unittest.TestCase):
         directory = ROOT / "Resources/Firmware"
         manifest = json.loads((directory / "manifest.json").read_bytes())
         self.assertEqual(set(manifest), {
-            "formatVersion", "chip", "flashSize", "protocol", "buildID", "image", "sha256"})
+            "formatVersion", "chip", "flashSize", "protocol", "buildID", "image", "sha256",
+            "firmwareVersion", "builtAt"})
+        version = manifest["firmwareVersion"]
+        self.assertRegex(version, r"^\d+\.\d+\.\d+$")
+        self.assertIn(f'#define MICMATRIX_FIRMWARE_VERSION "{version}"',
+                      (ROOT / "firmware/MicMatrix/Version.h").read_text())
         image = (directory / manifest["image"]).read_bytes()
         self.assertEqual(len(image), 4194304)
         self.assertEqual(manifest["sha256"], hashlib.sha256(image).hexdigest())
         fingerprints = json.loads((ROOT / "tools/firmware/fingerprints.json").read_bytes())
         self.assertEqual(fingerprints["micmatrixImageSHA256"], manifest["sha256"])
         app = image[0x10000:0x10000 + fingerprints["micmatrixLength"]]
+        self.assertIn(f"FIRMWARE MicMatrix {version} 4".encode(), app)
+        self.assertIn(manifest["builtAt"].encode(), app)
+        self.assertIn(manifest["buildID"].encode(), app)
+        from datetime import datetime
+        datetime.strptime(manifest["builtAt"], "%Y-%m-%dT%H:%M:%SZ")
         self.assertEqual(hashlib.sha256(app).hexdigest(), fingerprints["micmatrixSHA256"])
         self.assertEqual(image[0x9000:0xe000], b"\xff" * 0x5000)
         self.assertEqual(image[0x10000 + len(app):], b"\xff" * (len(image) - 0x10000 - len(app)))

@@ -1,7 +1,23 @@
 # Release notes
 
+## Firmware v4.0.3 and General cleanup
+
+- Replaced the selectable orientation-test tile with a red-and-cream pixel mushroom instead of the experimental Triforce; the gallery still has 16 choices.
+- Retained the arrow/lower-left-dot graphic for a matrix-only 2.5-second preview when Orientation or Mirror changes, followed by current-status restoration. Preview respects pause, output disablement, automatic blanking and firmware-operation ownership.
+- Updated generated firmware artwork and both SVG galleries. Existing saved orientation-artwork/Triforce choices become Pixel mushroom; explicit CLI arrow diagnostics remain supported.
+- Added board-reported source build ID and UTC build timestamp alongside firmware version/protocol. Bundle manifests carry the same metadata, and installation checks it before declaring success.
+- General's firmware section starts collapsed with a one-line status; expand it for metadata, backups and all firmware controls.
+- Extended the power-only animation to `MIC_MATRIX_v4.0.3`, deriving the suffix from the actual firmware version and retaining the per-character color cycle, half-second timing and three-second final pause.
+
+## Firmware v4.0.1
+
+- Added a power-only `MIC_MATRIX` letter/color cycle after a ten-second boot grace period, with 0.5-second characters and a three-second dark pause.
+- Standalone letters use 20% absolute brightness (51/255); host-controlled status output retains its existing 10% limit. Gamma mapping, orientation and IMU safety are preserved.
+- USB host detection uses bus traffic and latches until power-cycle, so a connected or sleeping computer without the app never falls back to the demo. Local demo rendering never renews the host watchdog.
+
 ## v4.0.0 — 2026-11-13
 
+- MicMatrix firmware now reports its semantic version and protocol through INFO and alongside HELLO. General displays the board-reported installed version rather than substituting the bundled build. Older firmware remains supported with an explicit version-not-reported status; installation checks the expected reported version before declaring readiness.
 - Added app-contained Apple Silicon firmware installation and original-firmware restore for the Waveshare ESP32-S3-Matrix, including a bundled clean firmware image and standalone flashing helper.
 - General now shows evidence-based device/firmware status, identity inspection, default verified full backups, backup paths/Finder reveal/import and restore actions. A backup opt-out requires a separate destructive confirmation.
 - Flash operations validate chip identity, flash size, security state and image checksums. The preserved first original is not replaced by later snapshots.

@@ -11,7 +11,8 @@ struct SettingsWindowTests: App {
         }
         Settings {
             SettingsView(selectedTab: $fixture.tab,
-                expandAdvancedDetails: !CommandLine.arguments.contains("--screenshots"))
+                expandAdvancedDetails: !CommandLine.arguments.contains("--screenshots"),
+                expandFirmwareDetails: CommandLine.arguments.contains("--firmware-layout"))
                 .environmentObject(fixture.controller)
                 .preferredColorScheme(CommandLine.arguments.contains("--light") ? .light : .dark)
                 .background(SettingsSizeProbe(fixture: fixture))
@@ -59,6 +60,10 @@ private final class SettingsFixture: ObservableObject {
         }
         initialSettings = settings
         controller = AppController(measurementSettings: settings)
+        if CommandLine.arguments.contains("--firmware-layout") {
+            // Opt-in real-board read-only check; default test fixtures never access hardware.
+            controller.firmware.start()
+        }
     }
 
     static func testColorEntry() {

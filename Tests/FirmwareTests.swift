@@ -16,6 +16,7 @@ enum FirmwareTests {
             try fakeHelper()
             return
         }
+        AppController.testOrientationPreviewLifecycle()
         let activity = FakeFirmwareActivity()
         FirmwareApplicationDelegate.manager = activity
         let delegate = FirmwareApplicationDelegate()

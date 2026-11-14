@@ -6,6 +6,17 @@
 
 using namespace MatrixProtocol;
 
+void testFirmwareInfo() {
+  Command command;
+  char info[] = "INFO";
+  assert(parse(info, command) && command.kind == Kind::Info);
+  char invalid[] = "INFO extra";
+  assert(!parse(invalid, command));
+  char expected[80];
+  snprintf(expected, sizeof(expected), "FIRMWARE MicMatrix %s %u", FirmwareVersion, ProtocolVersion);
+  assert(strcmp(FirmwareInfo, expected) == 0);
+}
+
 bool accepts(const char* text, Command& result) {
   char line[MaxLine + 1];
   assert(strlen(text) <= MaxLine);
@@ -380,6 +391,7 @@ void testRenderer() {
 }
 
 int main() {
+  testFirmwareInfo();
   testPresets();
   testLease();
   testPresetClock();

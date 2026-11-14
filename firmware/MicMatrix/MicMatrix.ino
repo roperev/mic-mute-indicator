@@ -4,6 +4,9 @@
 #include "Protocol.h"
 #include "Orientation.h"
 #include "Renderer.h"
+#include "Standalone.h"
+#include <HWCDC.h>
+#include "BuildInfo.h"
 
 Adafruit_NeoPixel pixels(64, 14, NEO_RGB + NEO_KHZ800);
 char inputLine[MatrixProtocol::MaxLine + 1];
@@ -14,6 +17,10 @@ MatrixProtocol::PresetClock presetClock;
 uint32_t lastRender = 0;
 uint8_t renderedPixels[64][3] = {};
 bool haveRendered = false;
+MatrixProtocol::StandaloneState standalone;
+bool standaloneShowing = false;
+int lastStandaloneLetter = -1;
+uint8_t lastStandaloneRotation = 0;
 SensorQMI8658 imu;
 MatrixProtocol::Orientation orientation;
 MatrixProtocol::Command currentFrame;
@@ -65,6 +72,7 @@ void clearDisplay() {
   const uint8_t blank[64][3] = {};
   showFrame(blank);
   displayLease.stop();
+  standaloneShowing = false;
 }
 
 void expireDisplay(uint32_t now) {
@@ -83,8 +91,17 @@ void processLine() {
     Serial.println("ERR command");
     return;
   }
+  standalone.computerSeen = true;
+  if (standaloneShowing) clearDisplay();
   if (command.kind == MatrixProtocol::Kind::Hello) {
     Serial.println(imuHealthy() ? "MATRIX 4 8 8 25 PRESET1" : "ERR imu-unavailable");
+    if (imuHealthy()) Serial.printf("%s %s %s\n", MatrixProtocol::FirmwareInfo,
+        MatrixProtocol::FirmwareBuildID, MatrixProtocol::FirmwareBuiltAt);
+    return;
+  }
+  if (command.kind == MatrixProtocol::Kind::Info) {
+    Serial.printf("%s %s %s\n", MatrixProtocol::FirmwareInfo,
+        MatrixProtocol::FirmwareBuildID, MatrixProtocol::FirmwareBuiltAt);
     return;
   }
   if (command.kind == MatrixProtocol::Kind::Orientation) {
@@ -158,6 +175,8 @@ void setup() {
 
 void loop() {
   const uint32_t now = millis();
+  standalone.update(now, HWCDC::isPlugged());
+  if (standaloneShowing && standalone.computerSeen) clearDisplay();
   presetClock.update(now);
   expireDisplay(now);
   if (imuInitialized && uint32_t(now - lastImuPoll) >= 40) {
@@ -205,6 +224,18 @@ void loop() {
   if (displayLease.valid(renderNow) && MatrixProtocol::presetAnimated(currentFrame) &&
       uint32_t(renderNow - lastRender) >= MatrixProtocol::AnimationIntervalMs) {
     renderFrame(renderNow);
+  }
+  const int letter = standalone.letter(imuHealthy(), displayLease.active);
+  if (letter < 0) {
+    if (standaloneShowing) clearDisplay();
+  } else if (!standaloneShowing || letter != lastStandaloneLetter ||
+             orientation.quarterTurn != lastStandaloneRotation) {
+    uint8_t frame[64][3];
+    MatrixProtocol::renderStandalone(letter, orientation.quarterTurn, frame);
+    showFrame(frame);
+    standaloneShowing = true;
+    lastStandaloneLetter = letter;
+    lastStandaloneRotation = orientation.quarterTurn;
   }
   delay(1);
 }

@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "Artwork.h"
+#include "Version.h"
 
 namespace MatrixProtocol {
 constexpr uint8_t MaxBrightness = 25;
@@ -11,7 +12,7 @@ constexpr uint8_t MinBrightness = 3;
 constexpr uint32_t TimeoutMs = 3000;
 constexpr size_t MaxLine = 448;
 
-enum class Kind { Hello, Status, Orientation, Off, Draw, Frame, Preset, Keep };
+enum class Kind { Hello, Info, Status, Orientation, Off, Draw, Frame, Preset, Keep };
 
 struct Command {
   Kind kind = Kind::Hello;
@@ -91,6 +92,11 @@ inline bool parse(char* line, Command& result) {
   }
   if (count == 1 && strcmp(tokens[0], "HELLO") == 0) {
     result = Command{};
+    return true;
+  }
+  if (count == 1 && strcmp(tokens[0], "INFO") == 0) {
+    result = Command{};
+    result.kind = Kind::Info;
     return true;
   }
   if (count == 1 && strcmp(tokens[0], "STATUS") == 0) {
