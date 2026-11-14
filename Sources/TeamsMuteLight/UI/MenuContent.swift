@@ -39,10 +39,10 @@ struct MenuContent: View {
             .keyboardShortcut(",")
 
         Button("Quit Teams Mute Light") {
-            c.shutdown()
             NSApp.terminate(nil)
         }
         .keyboardShortcut("q")
+        .disabled(c.firmware.protectedOperation)
     }
 
     private func showSettings() {

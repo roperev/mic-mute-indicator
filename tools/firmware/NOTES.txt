@@ -1,0 +1,132 @@
+MicMatrix app firmware backend (GPL-2.0-or-later)
+================================================
+Developer prerequisites:
+  Apple Silicon macOS; Homebrew Python 3.13; arduino-cli 1.5.1.
+  brew install python@3.13
+  bash tools/firmware/build.sh
+The manifest is written before installing development packages. Requirements
+are pinned in requirements.txt; build/firmware-python is developer-only.
+sketch.yaml pins ESP32 Arduino 3.3.12, Adafruit NeoPixel 1.15.5, SensorLib 0.5.1.
+Arduino's standalone esptool is used only by arduino-cli at build time.
+No build/preparation/test command opens or enumerates connected devices.
+--helper-only skips rebuilding an already prepared firmware asset.
+
+Outputs:
+  build/FirmwareTools/MicMatrixFlasher: one-file arm64 frozen Python helper,
+    Python 3.13.16 + esptool 5.3.1, with embedded flasher stub/config/fingerprints.
+    No Python, Arduino CLI, Homebrew, esptool executable, or network needed at runtime.
+  Resources/Firmware/micmatrix.bin: freshly compiled, 4 MiB, padded with FF.
+    Bootloader @0, partitions @8000, boot_app0 @e000, application @10000.
+    NVS and other unpopulated regions are erased, never copied from a device.
+  Resources/Firmware/manifest.json: exact version-1 app manifest, protocol 4.
+    buildID = SHA256 of sorted sketch .ino/.h/.yaml filename + NUL +
+    file bytes + NUL. No INFO extension is implemented; HELLO is unchanged.
+  Resources/Firmware/CorrespondingSource.tar.gz, NativeRuntimeSource.tar.gz and
+    licenses/: distribute with the helper/firmware. Sources are split into two
+    archives so neither exceeds GitHub's per-file limit. No personal or
+    connected-device backups are included.
+
+Invocation:
+  MicMatrixFlasher --request /absolute/request.json
+  --version performs an offline embedded-Python/esptool/stub smoke test.
+Request object:
+  operation: inspect | install | restore
+  port: one exact /dev/cu.* path, never a URL, wildcard, or autodetected port
+  expectedMAC: colon-separated hardware MAC (case-insensitive); mandatory for writes
+  backupDirectory: absolute user-data directory (helper enforces 0700)
+  imagePath, imageSHA256: required for install/restore, exactly 4 MiB + SHA256
+  backup: boolean, defaults true (also applies to restore)
+  skipBackupConfirmed: must be true if backup=false
+  restoreMetadataPath: required for restore; a finalized verified metadata file
+  knownOriginalImageSHA256: optional immutable original application reference:
+    423eb8c0ba178b11f5d167d53d7fbf1a802bb66e3e1d1dc59e398e05536945e5
+    ONLY the application @0x10000, length 1251504, NOT the full flash hash.
+
+stdout is flushed JSON lines, one event per line. esptool's diagnostic output
+is redirected to stderr and capped at 64 KiB; no flash contents are printed.
+Events: progress, device, backup, readyToWrite, complete, error.
+device: chip="esp32s3", mac, flashSize=4194304, secured=false,
+        firmware="stock" | "micmatrix" |
+        "micmatrix (protocol 4; build unknown)" | "MicroPython" | "unrecognized".
+Fingerprinting uses app bytes, not a bare ESP USB VID or a guess from HELLO.
+Unrecognized firmware is NEVER reported as stock.
+The exact known-original application hash is the only stock evidence.
+An exact bundled application digest identifies the bundled MicMatrix image.
+Other runtime recognition requires a nonoverlapping, MD5-validated standard
+ESP32 partition table with an application partition at 0x10000. Only the exact
+application image is completed and read within that declared partition's bounds,
+not the entire flash. This also handles applications larger than the original
+factory application's fingerprint window.
+Older protocol-4 builds are conservatively recognized only when an ESP32-S3
+application has a valid segment checksum and appended SHA256, and the complete
+v4 HELLO plus four distinctive protocol/error strings occur together inside
+one flash-mapped, read-only DROM segment. Strings in mutable RAM, NVS, trailing
+flash, malformed images or nonmatching stock hashes do not identify a runtime.
+This is protocol-family evidence, not cryptographic firmware authentication or
+a known build ID. The parent still verifies the live HELLO after installation.
+MicroPython additionally requires a complete version/date C-string banner and
+both its raw-REPL exit and friendly help C-strings together in one validated
+DROM segment. Signatures were verified against upstream v1.26.1 definitions:
+https://github.com/micropython/micropython/blob/v1.26.1/py/mpconfig.h
+https://github.com/micropython/micropython/blob/v1.26.1/shared/runtime/pyexec.c
+The official ESP32_GENERIC_S3-20250911-v1.26.1.bin was positively classified
+offline (SHA256 d6c48687f684cc7c002a0a4acd258f881c4b391f3ef121726a3b7cd285dcdbbc).
+That public binary is not bundled. Data/NVS, RAM, trailing bytes, incomplete
+signatures, corrupt images/partitions, and conflicting runtime signatures do
+not identify MicroPython. This is conservative family evidence, not firmware
+authentication, an exhaustive alternate detector, or support for every custom
+MicroPython build/partition layout. Without positive evidence, classification
+remains qualified "unrecognized", never alternate or stock by exclusion.
+backup: backupPath (.bin), metadataPath (.json), sha256, mac.
+readyToWrite: mac. Parent must engage quit/sleep protection BEFORE sending:
+  {"command":"authorizeWrite","mac":"aa:bb:cc:dd:ee:ff"}\n
+Authorization MACs are also case-insensitive; both use the same strict
+colon-separated MAC validation. Extra authorization fields remain rejected.
+Keep stdin open until the helper finishes. Alternatively send:
+  {"command":"cancel"}\n
+Wait is bounded at 180 seconds. Early/stale authorization, EOF, wrong MAC,
+oversized/malformed input and cancellation all fail BEFORE erasure.
+While backup is running only cancel is accepted. Authorization follows ready.
+Cancellation after erasure starts is intentionally not supported: do NOT kill
+the helper or release power/quit guards before its final result.
+
+One connection is retained throughout identification, backup, confirmation,
+write, and independent full readback. esptool reconnect/retry is disabled.
+No force, encryption/eFuse programming, arbitrary addresses, or CLI pass-through.
+Only unsecured, unrestricted ESP32-S3 chips with actual 4 MiB flash are allowed.
+MAC mismatches fail before backup. Security/identity discovery failures fail closed.
+Default backup failure never silently skips backup or reaches readyToWrite.
+
+Backups use exclusive UUID-named 0600 partial files in the 0700 directory.
+Exact byte count, disk hash, and a second independent full flash readback are
+verified before finalization. Originals are recognized only from known original
+app bytes and a never-replaced original-<mac>.json record; later backups are
+snapshots. A previously verified parent-imported original record also prevents
+creating another original. Imported provenance labels are accepted as strings,
+but never influence device fingerprint classification. Prior originals/metadata
+are never overwritten.
+Metadata: formatVersion, mac, chip, flashSize, sha256, imagePath, verified=true,
+role ("original"|"snapshot"), firmware, createdAt (UTC ISO8601).
+Restore validates finalized metadata, matching MAC/path/hash and exact full image.
+Imported full-flash backups must use this same schema; partial files are rejected.
+
+transaction.json is atomically fsynced 0600 before any erasure; states writing,
+verified, complete, failed, cancelled, inspected. A stale writing/verified journal signals interruption;
+do not treat it as success. The parent should surface this recovery condition.
+Success requires full exact byte readback and successful reset. MicMatrix's
+post-reset HELLO verification is the parent's responsibility. Restore may boot
+non-MicMatrix firmware. Failed destructive operations stay in the bootloader
+for recovery; prewrite failure/cancel resets and closes the selected device.
+An error is exit status 1; complete is exit status 0. Firmware protocol is 4.
+Stage deadlines: connect/identify/stub 45s each, fingerprint/confirmation 180s
+each, backup read/backup verification/write/full verification 600s each, reset
+30s. Interrupted writes never auto-reconnect to a possibly different device.
+
+Frozen dependency audit (also run by build.sh):
+  "$PWD/build/firmware-python/bin/python" tools/firmware/tests/audit_frozen.py \
+    build/FirmwareTools/MicMatrixFlasher
+This extracts the frozen archive into a project-local build directory, checks
+every embedded Mach-O/Python extension's architecture, dylib load commands and
+rpaths, then removes the extracted files. All non-system loads must resolve
+inside the extracted bundle. Unresolved Homebrew/developer paths fail the audit.
+Source/debug path strings are not runtime dylib dependencies.

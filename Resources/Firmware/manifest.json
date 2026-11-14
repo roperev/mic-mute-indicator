@@ -1,0 +1,9 @@
+{
+  "formatVersion": 1,
+  "chip": "esp32s3",
+  "flashSize": 4194304,
+  "protocol": 4,
+  "buildID": "e6afc4110db1001ce8446b6b35213d0dd25d307f9c02e954cef614414e81a65e",
+  "image": "micmatrix.bin",
+  "sha256": "d952e5b27acd0ebf4be36bb0c252dc9f3382462de3bc0f6107de3b390d7871c3"
+}

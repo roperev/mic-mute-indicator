@@ -18,6 +18,7 @@ enum Entry {
 }
 
 struct TeamsMuteLightApp: App {
+    @NSApplicationDelegateAdaptor(FirmwareApplicationDelegate.self) private var appDelegate
     @StateObject private var controller = AppController()
 
     var body: some Scene {

@@ -14,6 +14,10 @@ enum CLI {
         guard let cmd = args.first else { usage() }
 
         switch cmd {
+        case "firmware":
+            do { try FirmwareManager.runFirmwareCLI(Array(args.dropFirst())) }
+            catch { fail("Firmware operation failed: \(error.localizedDescription)") }
+            exit(0)
         case "animation-benchmark":
             guard args.count == 3, let seconds = Double(args[1]),
                   seconds.isFinite, (3...60).contains(seconds), !args[2].isEmpty else { usage() }
@@ -214,6 +218,11 @@ enum CLI {
         print("""
         Usage: TeamsMuteLight --cli <command>
           devices                                   List HID lights and Espressif USB serial devices
+          firmware status <port>                    Bounded non-resetting firmware connection check
+          firmware inspect <port>                   Reset/read device identity without writing flash
+          firmware import <port> --confirm-board --backup-path <original.bin>
+          firmware install|restore <port> --confirm-board --confirm-erase
+                                                    Diagnostics using the same bundled service; backup is mandatory
           animation-benchmark <seconds> <serial>    JSON controller/USB/CPU measurements, 3...60 s per scenario
           matrix-probe [serial]                     Verify MicMatrix firmware without lighting LEDs
           matrix-test [serial]                      Show five icons at 5%, then turn off

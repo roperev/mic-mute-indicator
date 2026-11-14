@@ -1,0 +1,19 @@
+MicMatrixFlasher helper: GPL-2.0-or-later; esptool 5.3.1: GPL-2.0-or-later.
+The Swift application communicates with the helper as a separate process.
+Distribute CorrespondingSource.tar.gz, NativeRuntimeSource.tar.gz and notices with binaries.
+The archive includes the exact helper source/build scripts, dependency source
+distributions (including PyInstaller and bootloader source), CPython, OpenSSL,
+xz, mpdecimal, Homebrew runtime formulae, sketch source and pinned firmware library sources.
+PyInstaller: GPL-2.0-or-later with its bootloader distribution exception.
+CPython: PSF-2.0 and notices in CPython-LICENSE.txt.
+See licenses/ for each dependency's preserved copyright/license texts.
+Arduino ESP32 core 3.3.12: LGPL-2.1-or-later; corresponding core source included.
+Adafruit NeoPixel 1.15.5: LGPL-3.0-or-later; full library source included.
+SensorLib 0.5.1: MIT; included third-party notices apply to respective files.
+ESP-IDF 5.5.5: Apache-2.0 with component-specific notices in upstream source:
+https://github.com/espressif/esp-idf/tree/v5.5.5
+Toolchain/runtime newlib components carry their permissive upstream notices:
+https://github.com/espressif/newlib-esp32
+Source rebuilding is described in tools/firmware/NOTES.txt in the archive.
+No original-device image, personal backup, credential or user data is included.
+Source digests and URLs: licenses/source-index.json.

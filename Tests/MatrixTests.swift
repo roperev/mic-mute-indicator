@@ -61,7 +61,11 @@ enum MatrixTests {
         precondition(MatrixReply(line: "OK 4294967295") == .acknowledged(UInt32.max))
         precondition(MatrixReply(line: "ERR command") == .error("command"))
         precondition(MatrixReply(line: "TIMEOUT") == .timeout)
-        for line in ["MATRIX 3 8 8 12", "MATRIX 2 8 8 12", "MATRIX 1 8 8 63", "MATRIX 2 8 8 5", "MATRIX 2 8 8 25", "MATRIX 2 8 8 255", "OK -1", "OK +1",
+        for line in ["MATRIX 3 8 8 12", "MATRIX 2 8 8 12", "MATRIX 1 8 8 63",
+                     "MATRIX 2 8 8 5", "MATRIX 2 8 8 25", "MATRIX 2 8 8 255", "MATRIX 5 8 8 25 PRESET1"] {
+            precondition(MatrixReply(line: line) == .error("Unsupported MicMatrix handshake: \(line)"))
+        }
+        for line in ["OK -1", "OK +1",
                      "OK 4294967296", "OK 1 extra", "boot diagnostics"] {
             precondition(MatrixReply(line: line) == nil)
         }

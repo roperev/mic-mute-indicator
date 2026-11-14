@@ -1,5 +1,23 @@
 # Release notes
 
+## v4.0.0 — 2026-11-13
+
+- Added app-contained Apple Silicon firmware installation and original-firmware restore for the Waveshare ESP32-S3-Matrix, including a bundled clean firmware image and standalone flashing helper.
+- General now shows evidence-based device/firmware status, identity inspection, default verified full backups, backup paths/Finder reveal/import and restore actions. A backup opt-out requires a separate destructive confirmation.
+- Flash operations validate chip identity, flash size, security state and image checksums. The preserved first original is not replaced by later snapshots.
+- Normal app termination, relaunch and cancellation are blocked during destructive writing/verification; idle sleep is inhibited and failures retain recovery journals. Force Quit, USB disconnection and power loss remain unavoidable interruption risks.
+- Download packaging is locally/self-signed and not Apple-notarized. End users need no Python, Arduino CLI, Homebrew or runtime downloads; macOS approval may be necessary.
+- Verified the real board from custom to its original stock, to bundled custom, back to stock and finally to custom, with complete flash verification and retained originals. Native Quit was rejected during actual protected flashing. Added 59 helper tests and contained-runtime/failure checks.
+- Redesigned the four SwiftUI Settings tabs while retaining the fixed 760 x 1030-point window and original native styling.
+- General now separates detected status from a labeled Pause lights switch, and adds project details, version/build and a GitHub link.
+- Lights lists Waveshare Matrix first, followed by Kuando, BlinkStick, Home Assistant and Webhook/WLED. Streamlined matrix cards align controls, put Test at the top right and use compact Enabled switches and brightness percentages.
+- Renamed Original palette to Full color without changing its rendering or saved identifier.
+- Replaced native color panels throughout Settings with a shared 16-color swatch popover and validated custom hex entry. Invalid/unapplied text never changes the chosen color.
+- Moved master brightness guidance into an information tooltip, removed gamma implementation notes from the controls, and replaced collapsed orientation calibration with an always-visible segmented offset picker and horizontal Mirror switch.
+- Rebuilt Effects around per-state Solid/Pulse/Flash controls and a single call-start rainbow section. Fresh installs still enable the rainbow; saved choices are preserved.
+- Clarified Teams button-label matching, replaced the polling slider with common interval choices, and tidied diagnostics and event-log actions.
+- Added isolated desktop layout/hex-validation/settings-preservation checks plus firmware lifecycle/image/process safety tests. App version is 4.0.0 (build 6); the matrix rendering protocol, detection engine, output defaults and menu-bar behavior are unchanged.
+
 ## v3.0.1 — 2026-11-11
 
 - Bumped the app version to 3.0.1 (build 5), visible in Settings > General, to distinguish the updated installed app.

@@ -59,6 +59,8 @@ final class AppController: ObservableObject {
     let matrix = MatrixLight()
     let homeAssistant = HomeAssistantLight()
     let webhook = WebhookLight()
+    let firmware = FirmwareManager()
+    private var firmwareUpdates: AnyCancellable?
 
     private var axRunning = false
     private var previewWork: DispatchWorkItem?
@@ -182,6 +184,7 @@ final class AppController: ObservableObject {
         homeAssistantToken = measurementSettings == nil ? (Keychain.get(.homeAssistantToken) ?? "") : ""
         homeAssistant.token = homeAssistantToken
         matrix.onChange = { [weak self] in
+            if let self { self.firmware.observe(self.matrix) }
             self?.objectWillChange.send()
             self?.pushLights()
         }
@@ -189,6 +192,26 @@ final class AppController: ObservableObject {
             configureOutputs()
             return
         }
+        FirmwareApplicationDelegate.manager = firmware
+        firmwareUpdates = firmware.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }
+        firmware.suspendOutput = { [weak self] completion in
+            guard let self else { completion(); return }
+            self.matrix.releaseForFirmware(completion: completion)
+        }
+        firmware.resumeOutput = { [weak self] in self?.pushLights() }
+        firmware.didInstall = { [weak self] device, use in
+            guard let self, use else { return }
+            self.settings.matrix.light.deviceSerial = device.serial
+            self.settings.matrix.light.enabled = true
+        }
+        firmware.didRestore = { [weak self] device in
+            guard let self else { return }
+            if self.settings.matrix.light.deviceSerial.isEmpty ||
+                self.settings.matrix.light.deviceSerial == device.serial {
+                self.settings.matrix.light.enabled = false
+            }
+        }
+        firmware.start()
 
         teamsAPI.onChange = { [weak self] snap in
             self?.api = snap
@@ -409,6 +432,7 @@ final class AppController: ObservableObject {
         let state = previewState ?? micState
         let needsAnimation = activeOutputs.contains { active in
             if active.output === matrix {
+                guard isolatedMeasurement || !firmware.suppressesOutput(serial: matrix.serial) else { return false }
                 guard !matrixAvailability.shouldBlank(state: micState) else { return false }
                 return rainbowUntil != nil || (matrix.connectedDevice != nil && !matrix.supportsPresets &&
                     (settings.effects[state].effect != .solid || settings.matrix.icons[state].isAnimated))
@@ -433,6 +457,7 @@ final class AppController: ObservableObject {
         }
         for a in activeOutputs {
             if a.output === matrix {
+                if !isolatedMeasurement && firmware.suppressesOutput(serial: matrix.serial) { continue }
                 if matrixAvailability.shouldBlank(state: micState) {
                     if !matrixAutomaticallyBlanked {
                         matrix.release()
@@ -596,6 +621,10 @@ final class AppController: ObservableObject {
     }
 
     func shutdown() {
+        guard !firmware.busy else {
+            Log.info("Shutdown blocked until firmware work reaches a safe state")
+            return
+        }
         menuBarPulseTimer?.invalidate()
         menuBarPulseTimer = nil
         screenLockTokens.forEach { DistributedNotificationCenter.default().removeObserver($0) }
@@ -622,6 +651,10 @@ final class AppController: ObservableObject {
     /// Start a fresh instance and quit this one. macOS sometimes only honours a new
     /// Accessibility grant after the process restarts.
     func relaunch() {
+        guard !firmware.busy else {
+            firmware.showingProgress = true
+            return
+        }
         let cfg = NSWorkspace.OpenConfiguration()
         cfg.createsNewApplicationInstance = true
         let url = Bundle.main.bundleURL

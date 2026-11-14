@@ -9,4 +9,4 @@ done < <(find Sources/TeamsMuteLight -name '*.swift' ! -name Entry.swift | sort)
 swiftc "${sources[@]}" Tests/SettingsWindowTests.swift -o build/settings-window-tests \
   -framework IOKit -framework CoreAudio -framework ApplicationServices \
   -framework ServiceManagement -framework Security
-build/settings-window-tests
+build/settings-window-tests "$@"

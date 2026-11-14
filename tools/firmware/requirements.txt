@@ -1,0 +1,23 @@
+# Complete, pinned developer/build environment. Never installed on end-user systems.
+esptool==5.3.1
+pyinstaller==6.22.3
+pyinstaller-hooks-contrib==2026.10
+altgraph==0.17.5
+macholib==1.16.4
+packaging==26.3
+setuptools==84.2.1
+bitstring==4.3.1
+bitarray==3.12.3
+cryptography==50.0.2
+cffi==2.1.1
+pycparser==3.12
+pyserial==3.5
+reedsolo==1.7.0
+PyYAML==6.0.3
+intelhex==2.3.0
+rich-click==1.9.9
+rich==15.0.0
+click==8.5.1
+markdown-it-py==4.3.0
+mdurl==0.1.2
+pygments==2.21.0

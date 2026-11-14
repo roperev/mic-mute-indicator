@@ -46,23 +46,38 @@ swift build -c release
 BIN="$(swift build -c release --show-bin-path)/$EXEC"
 
 echo "==> Assembling $APP"
+HELPER="build/FirmwareTools/MicMatrixFlasher"
+if [[ ! -x "$HELPER" || ! -f Resources/Firmware/manifest.json || ! -f Resources/Firmware/micmatrix.bin ]]; then
+  echo "Missing bundled firmware/helper. Run the developer preparation scripts in tools/firmware first." >&2
+  exit 1
+fi
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Helpers"
 cp "$BIN" "$APP/Contents/MacOS/$EXEC"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+ditto Resources/Firmware "$APP/Contents/Resources/Firmware"
+cp "$HELPER" "$APP/Contents/Helpers/MicMatrixFlasher"
 
 echo "==> Signing (identity: $SIGN_IDENTITY)"
+codesign --force --sign "$SIGN_IDENTITY" --identifier "$BUNDLE_ID.flasher" "$APP/Contents/Helpers/MicMatrixFlasher"
+shasum -a 256 "$APP/Contents/Helpers/MicMatrixFlasher" | awk '{print $1}' > "$APP/Contents/Resources/Firmware/helper-sha256.txt"
 codesign --force --sign "$SIGN_IDENTITY" --identifier "$BUNDLE_ID" "$APP"
-codesign --verify --strict "$APP" || echo "    (warning: codesign --verify reported a problem)"
+codesign --verify --strict "$APP/Contents/Helpers/MicMatrixFlasher"
+codesign --verify --strict "$APP"
 echo "    designated requirement: $(codesign -d -r- "$APP" 2>&1 | sed -n 's/^designated => //p')"
 
 if [[ $INSTALL -eq 1 ]]; then
   DEST="/Applications/$APP_NAME.app"
   echo "==> Installing to $DEST"
-  pkill -x "$EXEC" 2>/dev/null || true
+  if [[ -d "$DEST" ]]; then
+    osascript -e 'tell application "Teams Mute Light" to quit'
+  fi
   sleep 0.5
-  rm -rf "$DEST"
-  cp -R "$APP" "$DEST"
+  if ps -axo comm | grep -Fx "$DEST/Contents/MacOS/$EXEC"; then
+    echo "The app is still running (possibly protecting a firmware operation). Installation stopped." >&2
+    exit 1
+  fi
+  ditto "$APP" "$DEST"
   APP="$DEST"
   if [[ "$SIGN_IDENTITY" == "-" ]]; then
     echo "==> Ad-hoc build: clearing stale Accessibility entry for $BUNDLE_ID"

@@ -1,0 +1,213 @@
+[
+  {
+    "file": "esptool-5.3.1.tar.gz",
+    "url": "https://files.pythonhosted.org/packages/76/ac/d2016cf6b3709d0e0166f45f84bc6e2d717757b5f59020ccb34de08d1b9b/esptool-5.3.1.tar.gz",
+    "sha256": "125781f36e6a2d08c484524a45f340694675368b5eeead9d0cb21b2034a91d98",
+    "package": "esptool",
+    "version": "5.3.1"
+  },
+  {
+    "file": "pyinstaller-6.22.3.tar.gz",
+    "url": "https://files.pythonhosted.org/packages/63/41/f90302845945abd4ed647933ff5ee7c6ac93983187be67f897b6cb613331/pyinstaller-6.22.3.tar.gz",
+    "sha256": "05eb2f5615503e72939a7224d68b4aff572c6b0438ee4a17d0a4b481f399362d",
+    "package": "pyinstaller",
+    "version": "6.22.3"
+  },
+  {
+    "file": "pyinstaller_hooks_contrib-2026.10.tar.gz",
+    "url": "https://files.pythonhosted.org/packages/45/87/9a32062fb1296b43e866ec78313f887e12b09e6bc344c694647856bcd907/pyinstaller_hooks_contrib-2026.10.tar.gz",
+    "sha256": "7e906c659522e592a1680f30f709ffb6333277141a695926aa7190592205c5e3",
+    "package": "pyinstaller-hooks-contrib",
+    "version": "2026.10"
+  },
+  {
+    "file": "altgraph-0.17.5.tar.gz",
+    "url": "https://files.pythonhosted.org/packages/7e/f8/97fdf103f38fed6792a1601dbc16cc8aac56e7459a9fff08c812d8ae177a/altgraph-0.17.5.tar.gz",
+    "sha256": "c87b395dd12fabde9c99573a9749d67da8d29ef9de0125c7f536699b4a9bc9e7",
+    "package": "altgraph",
+    "version": "0.17.5"
+  },
+  {
+    "file": "macholib-1.16.4.tar.gz",
+    "url": "https://files.pythonhosted.org/packages/10/2f/97589876ea967487978071c9042518d28b958d87b17dceb7cdc1d881f963/macholib-1.16.4.tar.gz",
+    "sha256": "f408c93ab2e995cd2c46e34fe328b130404be143469e41bc366c807448979362",
+    "package": "macholib",
+    "version": "1.16.4"
+  },
+  {
+    "file": "packaging-26.3.tar.gz",
+    "url": "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz",
+    "sha256": "94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79",
+    "package": "packaging",
+    "version": "26.3"
+  },
+  {
+    "file": "setuptools-84.2.1.tar.gz",
+    "url": "https://files.pythonhosted.org/packages/70/b3/c19426f783614d625699a4b247faf628ea9ab1db228674491767b417f9e1/setuptools-84.2.1.tar.gz",
+    "sha256": "3ff8b3b5492a0aa66960f4419365a86b84e013070d4313e4d4a6894f5d64d6bc",
+    "package": "setuptools",
+    "version": "84.2.1"
+  },
+  {
+    "file": "bitstring-4.3.1.tar.gz",
+    "url": "https://files.pythonhosted.org/packages/15/a8/a80c890db75d5bdd5314b5de02c4144c7de94fd0cefcae51acaeb14c6a3f/bitstring-4.3.1.tar.gz",
+    "sha256": "a08bc09d3857216d4c0f412a1611056f1cc2b64fd254fb1e8a0afba7cfa1a95a",
+    "package": "bitstring",
+    "version": "4.3.1"
+  },
+  {
+    "file": "bitarray-3.12.3.tar.gz",
+    "url": "https://files.pythonhosted.org/packages/a9/cc/aa09a20048dd650d9a36bd70c26b2688413066d65acc9f484f94b9929108/bitarray-3.12.3.tar.gz",
+    "sha256": "919e35a951c0a551631b94bf568f3f5e38d004e0c60866cb2ca51bd8c4778fec",
+    "package": "bitarray",
+    "version": "3.12.3"
+  },
+  {
+    "file": "cryptography-50.0.2.tar.gz",
+    "url": "https://files.pythonhosted.org/packages/9d/af/182eb91b0df3fe75c4d9f26fe70684569566745f6ba7e5c9c73a862c5252/cryptography-50.0.2.tar.gz",
+    "sha256": "7b46165bb56eb4704e2eaaf86f3c940d19154535d9b0ca7d6d590b04060e00d5",
+    "package": "cryptography",
+    "version": "50.0.2"
+  },
+  {
+    "file": "cffi-2.1.1.tar.gz",
+    "url": "https://files.pythonhosted.org/packages/9e/ef/008a1939e372c06329a3fce4279c02f328488f3526744906eeec3da7ad5f/cffi-2.1.1.tar.gz",
+    "sha256": "dd31f52ea1086513bb9df30f8fcee9b8918323ae067a3d5b78bc826a000712be",
+    "package": "cffi",
+    "version": "2.1.1"
+  },
+  {
+    "file": "pycparser-3.12.tar.gz",
+    "url": "https://files.pythonhosted.org/packages/cb/27/eeb9f307bf07060f3d9f9aa0fb8c15b01bdfded0a941e4b2719c7f94cacd/pycparser-3.12.tar.gz",
+    "sha256": "f03387877eab82ce01bbdfd0ba7252ee55a90b1c708d5129e2ce915475cf1db6",
+    "package": "pycparser",
+    "version": "3.12"
+  },
+  {
+    "file": "pyserial-3.5.tar.gz",
+    "url": "https://files.pythonhosted.org/packages/1e/7d/ae3f0a63f41e4d2f6cb66a5b57197850f919f59e558159a4dd3a818f5082/pyserial-3.5.tar.gz",
+    "sha256": "3c77e014170dfffbd816e6ffc205e9842efb10be9f58ec16d3e8675b4925cddb",
+    "package": "pyserial",
+    "version": "3.5"
+  },
+  {
+    "file": "reedsolo-1.7.0.tar.gz",
+    "url": "https://files.pythonhosted.org/packages/f7/61/a67338cbecf370d464e71b10e9a31355f909d6937c3a8d6b17dd5d5beb5e/reedsolo-1.7.0.tar.gz",
+    "sha256": "c1359f02742751afe0f1c0de9f0772cc113835aa2855d2db420ea24393c87732",
+    "package": "reedsolo",
+    "version": "1.7.0"
+  },
+  {
+    "file": "pyyaml-6.0.3.tar.gz",
+    "url": "https://files.pythonhosted.org/packages/05/8e/961c0007c59b8dd7729d542c61a4d537767a59645b82a0b521206e1e25c2/pyyaml-6.0.3.tar.gz",
+    "sha256": "d76623373421df22fb4cf8817020cbb7ef15c725b9d5e45f17e189bfc384190f",
+    "package": "PyYAML",
+    "version": "6.0.3"
+  },
+  {
+    "file": "intelhex-2.3.0.tar.gz",
+    "url": "https://files.pythonhosted.org/packages/66/37/1e7522494557d342a24cb236e2aec5d078fac8ed03ad4b61372586406b01/intelhex-2.3.0.tar.gz",
+    "sha256": "892b7361a719f4945237da8ccf754e9513db32f5628852785aea108dcd250093",
+    "package": "intelhex",
+    "version": "2.3.0"
+  },
+  {
+    "file": "rich_click-1.9.9.tar.gz",
+    "url": "https://files.pythonhosted.org/packages/96/3e/5688fdd83aea416de336582a274f2bc8236b5c261b04c11e17bc262786ad/rich_click-1.9.9.tar.gz",
+    "sha256": "324cba7513cd4187ee92b2eef21f071714e45be062458c8b157bd7e0c81103e3",
+    "package": "rich-click",
+    "version": "1.9.9"
+  },
+  {
+    "file": "rich-15.0.0.tar.gz",
+    "url": "https://files.pythonhosted.org/packages/c0/8f/0722ca900cc807c13a6a0c696dacf35430f72e0ec571c4275d2371fca3e9/rich-15.0.0.tar.gz",
+    "sha256": "edd07a4824c6b40189fb7ac9bc4c52536e9780fbbfbddf6f1e2502c31b068c36",
+    "package": "rich",
+    "version": "15.0.0"
+  },
+  {
+    "file": "click-8.5.1.tar.gz",
+    "url": "https://files.pythonhosted.org/packages/45/37/edbf1b0707709013c0cf2e8317e03d97ed29bf4cac709fe328904ae92a38/click-8.5.1.tar.gz",
+    "sha256": "9bbfada76703fd1d784b83eea012e3e8c6a001a876543ef104fa56aaaeb072b4",
+    "package": "click",
+    "version": "8.5.1"
+  },
+  {
+    "file": "markdown_it_py-4.3.0.tar.gz",
+    "url": "https://files.pythonhosted.org/packages/16/fc/cee2c45553c9a9bf77d8b0c391560c556d7ed756b1f0bb35eb5d48db09ea/markdown_it_py-4.3.0.tar.gz",
+    "sha256": "91a58fa5b72c71a40cf7177250fd767480d7a2bb3ac426ccfb76fb90305fdaaa",
+    "package": "markdown-it-py",
+    "version": "4.3.0"
+  },
+  {
+    "file": "mdurl-0.1.2.tar.gz",
+    "url": "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz",
+    "sha256": "bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba",
+    "package": "mdurl",
+    "version": "0.1.2"
+  },
+  {
+    "file": "pygments-2.21.0.tar.gz",
+    "url": "https://files.pythonhosted.org/packages/49/2e/ced460408999b33da6b31b0021b0f37d329e202d4169aeb164493778f25b/pygments-2.21.0.tar.gz",
+    "sha256": "610ca751c9bc2492b38eb9a38a7fbc93edbbb2d7182edaf34e66ae493dee5c8c",
+    "package": "pygments",
+    "version": "2.21.0"
+  },
+  {
+    "file": "esp-flasher-stub-v1.0.0.tar.gz",
+    "url": "https://codeload.github.com/espressif/esp-flasher-stub/tar.gz/refs/tags/v1.0.0",
+    "sha256": "1be3952df77a1512ae4476c3c9a4bb2c28115b9a878b5f39d82af008e155d3fa",
+    "package": "esp-flasher-stub",
+    "version": "v1.0.0"
+  },
+  {
+    "file": "esptool-legacy-flasher-stub-v1.11.1.tar.gz",
+    "url": "https://codeload.github.com/espressif/esptool-legacy-flasher-stub/tar.gz/refs/tags/v1.11.1",
+    "sha256": "f056a3f717178c6ec6f66a4560e32b23d180c67119dbb9d1da774845b49c2bfc",
+    "package": "esptool-legacy-flasher-stub",
+    "version": "v1.11.1"
+  },
+  {
+    "file": "Python-3.13.16.tgz",
+    "url": "https://www.python.org/ftp/python/3.13.16/Python-3.13.16.tgz",
+    "sha256": "cfac63bddf956deafb1172ca131ae5dcaafd6f95056086e233fca205593ed427",
+    "package": "python@3.13",
+    "version": "3.13.16"
+  },
+  {
+    "file": "openssl-3.6.5.tar.gz",
+    "url": "https://github.com/openssl/openssl/releases/download/openssl-3.6.5/openssl-3.6.5.tar.gz",
+    "sha256": "a2157c2830efdec3788939b00c9b0638306d3f0bbb76dc4832ee503bb397df98",
+    "package": "openssl@3",
+    "version": "3.6.5"
+  },
+  {
+    "file": "xz-5.8.4.tar.gz",
+    "url": "https://github.com/tukaani-project/xz/releases/download/v5.8.4/xz-5.8.4.tar.gz",
+    "sha256": "0014c7886930454fe8bd4228665b51af55eeae560ea135c9c4cd33f55b2591d9",
+    "package": "xz",
+    "version": "5.8.4"
+  },
+  {
+    "file": "mpdecimal-4.0.1.tar.gz",
+    "url": "https://www.bytereef.org/software/mpdecimal/releases/mpdecimal-4.0.1.tar.gz",
+    "sha256": "96d33abb4bb0070c7be0fed4246cd38416188325f820468214471938545b1ac8",
+    "package": "mpdecimal",
+    "version": "4.0.1"
+  },
+  {
+    "file": "Arduino-LGPL-2.1.txt",
+    "url": "https://raw.githubusercontent.com/espressif/arduino-esp32/3.3.12/LICENSE.md",
+    "sha256": "62e54861b30e953735dc187f036917c588665dbe3c5dd88449e34317608bbf5e"
+  },
+  {
+    "file": "GPL-3.0.txt",
+    "url": "https://raw.githubusercontent.com/spdx/license-list-data/main/text/GPL-3.0-only.txt",
+    "sha256": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0"
+  },
+  {
+    "file": "ESP-IDF-Apache-2.0.txt",
+    "url": "https://raw.githubusercontent.com/espressif/esp-idf/v5.5.5/LICENSE",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  }
+]

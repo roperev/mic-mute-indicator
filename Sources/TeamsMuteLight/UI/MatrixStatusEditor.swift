@@ -41,10 +41,6 @@ private struct MatrixStatusCard: View {
         })
     }
 
-    private var chosenColor: Binding<Color> {
-        Binding(get: { color.color }, set: { color = RGB(color: $0) })
-    }
-
     private var title: String {
         switch state {
         case .unmuted: return "Live"
@@ -55,14 +51,23 @@ private struct MatrixStatusCard: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
-            Text(title).font(.subheadline.bold()).lineLimit(1)
+        VStack(spacing: 12) {
+            Text(title)
+                .font(.subheadline.bold())
+                .lineLimit(1)
+                .padding(.horizontal, 35)
+                .frame(maxWidth: .infinity)
+                .overlay(alignment: .trailing) {
+                    Button("Test", action: preview)
+                        .controlSize(.small)
+                        .help("Preview \(title) on all enabled lights for three seconds")
+                        .accessibilityLabel("Test \(title) lights")
+                }
             Button { ui.choosingIcon = true } label: {
                 VStack(spacing: 5) {
                     MatrixIconPreview(icon: icon, color: color, style: style)
                     Text(icon == .orientation ? "Up arrow" : icon.label)
                         .font(.caption).lineLimit(1)
-                    Text("Choose icon").font(.caption2).foregroundStyle(.secondary)
                 }
             }
             .buttonStyle(.plain)
@@ -70,36 +75,42 @@ private struct MatrixStatusCard: View {
             .popover(isPresented: $ui.choosingIcon) {
                 MatrixIconChooser(selection: $icon) { ui.choosingIcon = false }
             }
-            Toggle("Display", isOn: enabled).toggleStyle(.switch).controlSize(.small)
-            Picker("Palette", selection: $style) {
-                ForEach(MatrixColorStyle.allCases) { Text($0.label).tag($0) }
+            Toggle("Enabled", isOn: enabled)
+                .toggleStyle(.switch).controlSize(.small)
+                .accessibilityLabel("\(title) enabled")
+            VStack(spacing: 8) {
+                Picker("Color mode", selection: $style) {
+                    ForEach(MatrixColorStyle.allCases) { Text($0.label).tag($0) }
+                }
+                .labelsHidden()
+                .accessibilityLabel("\(title) color mode")
+                .disabled(color.isOff)
+                HStack {
+                    if style != .artwork {
+                        ColorSwatchPicker(selection: $color, label: "\(title) color")
+                            .controlSize(.small)
+                            .disabled(color.isOff)
+                    }
+                }
+                .frame(height: 24)
             }
-            .labelsHidden()
-            .accessibilityLabel("\(title) color mode")
-            .disabled(color.isOff)
-            if style == .artwork {
-                Text("Built-in colors").font(.caption).foregroundStyle(.secondary)
-                    .frame(height: 22)
-            } else {
-                ColorPicker(style == .tinted ? "Tint" : "Color",
-                    selection: chosenColor, supportsOpacity: false)
-                    .controlSize(.small)
-                    .disabled(color.isOff)
-                    .frame(height: 22)
-            }
-            VStack(spacing: 4) {
-                Text("Brightness: \(Int((brightness * 100).rounded()))%")
-                    .font(.caption).monospacedDigit()
+            HStack(spacing: 6) {
                 Slider(value: $brightness, in: 0...1)
                     .controlSize(.small)
+                    .labelsHidden()
                     .accessibilityLabel("\(title) brightness, percent of master")
-                Text("of master").font(.caption2).foregroundStyle(.secondary)
+                    .help("State brightness")
+                Text("\(Int((brightness * 100).rounded()))%")
+                    .font(.caption.monospacedDigit())
+                    .frame(width: 34, alignment: .trailing)
             }
-            Button("Test") { preview() }.controlSize(.small)
-                .accessibilityLabel("Test \(title) lights")
         }
-        .padding(8)
+        .padding(10)
         .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10))
+        .onAppear { if !color.isOff { ui.previousColor = color } }
+        .onChange(of: color) { _, value in
+            if !value.isOff { ui.previousColor = value }
+        }
     }
 }
 

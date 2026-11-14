@@ -81,6 +81,7 @@ final class MatrixLight: LightOutput {
     private var timer: DispatchSourceTimer?
     private var reader: DispatchSourceRead?
     private var writer: DispatchSourceWrite?
+    private let descriptorClosures = DispatchGroup()
     private var wanted: Wanted?
     private var descriptor: Int32 = -1
     private var openedDevice: MatrixDeviceInfo?
@@ -227,6 +228,12 @@ final class MatrixLight: LightOutput {
             closePort(sendOff: true)
             publish("Disabled", device: nil)
         }
+
+    }
+
+    func releaseForFirmware(completion: @escaping () -> Void) {
+        release()
+        descriptorClosures.notify(queue: .main, execute: completion)
     }
 
     private func publish(_ status: String, device: MatrixDeviceInfo?) {
@@ -289,7 +296,12 @@ final class MatrixLight: LightOutput {
             if self.reader?.data == 0 { self.fail("USB device disconnected") }
             else { self.tick() }
         }
-        reader.setCancelHandler { Darwin.close(fd) }
+        descriptorClosures.enter()
+        let closures = descriptorClosures
+        reader.setCancelHandler {
+            Darwin.close(fd)
+            closures.leave()
+        }
         self.reader = reader
         reader.resume()
         var options = termios()
@@ -434,6 +446,10 @@ final class MatrixLight: LightOutput {
                     publish("Display timed out; resending state", device: openedDevice)
                 case .error(let error):
                     if !identified {
+                        if error.hasPrefix("Unsupported MicMatrix") || error.hasPrefix("imu-") {
+                            fail(error)
+                            return false
+                        }
                         Log.info("Matrix: draining pre-handshake firmware error: \(error)")
                         continue
                     }

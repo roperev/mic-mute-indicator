@@ -202,7 +202,7 @@ enum MatrixColorStyle: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .artwork: return "Original palette"
+        case .artwork: return "Full color"
         case .tinted: return "Tint artwork"
         case .solid: return "Single color"
         }
@@ -456,6 +456,10 @@ enum MatrixReply: Equatable {
     init?(line: String) {
         if line == "MATRIX 4 8 8 25 PRESET1" { self = .presets; return }
         if line == "MATRIX 3 8 8 25" { self = .hello; return }
+        if line.hasPrefix("MATRIX ") {
+            self = .error("Unsupported MicMatrix handshake: \(line)")
+            return
+        }
         if line == "TIMEOUT" { self = .timeout; return }
         if line.hasPrefix("ERR ") { self = .error(String(line.dropFirst(4))); return }
         let parts = line.split(separator: " ")
