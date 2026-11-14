@@ -9,6 +9,9 @@ cp build/settings-window-tests "$APP/Contents/MacOS/TeamsMuteLight"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 "$APP/Contents/MacOS/TeamsMuteLight" --screenshots --capture
 for tab in 0 1 2 3; do
+  if [[ "$tab" == 0 && -f Resources/screenshots/general.png && "${1:-}" != "--include-general" ]]; then
+    continue
+  fi
   case "$tab" in
     0) name=general ;;
     1) name=lights ;;

@@ -14,7 +14,7 @@ A macOS menu-bar app that shows **Microsoft Teams mute state**, not just microph
 
 ## Screenshots
 
-Current v4.0.0 Settings in dark appearance, rendered from the app's SwiftUI views with isolated sample settings. Device/status details depend on your connected hardware.
+Current v4.0.0 Settings in dark appearance. General shows the running app with a connected matrix and successful Teams detection; the other panels use isolated sample settings. Device/status details depend on your connected hardware.
 
 | General | Lights |
 |---|---|
@@ -31,7 +31,7 @@ Current v4.0.0 Settings in dark appearance, rendered from the app's SwiftUI view
 
 </details>
 
-Regenerate these images on macOS with `bash scripts/generate-settings-screenshots.sh`. This does not read or change your saved settings or flash any device.
+Regenerate the sample panels on macOS with `bash scripts/generate-settings-screenshots.sh`. The captured General screenshot is preserved unless the script is run with `--include-general`; replace it with a fresh successful-state capture when the app changes. Generation does not read or change your saved settings or flash any device.
 
 ## Install the app and set up a new matrix
 
